@@ -10,6 +10,7 @@ enum class TypeId
 	FirstTypeId = 120000,
 
 	AtomsCrowdReaderTypeId = 120001,
+	AtomsAgentReaderTypeId = 120002,
 
 	LastTypeId = 120499,
 };

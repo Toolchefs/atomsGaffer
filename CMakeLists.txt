@@ -33,3 +33,7 @@ install( DIRECTORY startup DESTINATION . FILES_MATCHING PATTERN "*.py" )
 # build the graphics
 ## \todo: remove maya specific Atoms paths once a Gaffer specific paths exists
 install( FILES ${ATOMS_ROOT}/maya/icons/logo_new.png DESTINATION graphics RENAME atoms_logo.png )
+
+# build the examples
+file( GLOB AtomsGafferExamples examples/scripts/*.gfr )
+install( FILES ${AtomsGafferExamples} DESTINATION examples/scripts )

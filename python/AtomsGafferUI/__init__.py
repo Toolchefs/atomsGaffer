@@ -3,3 +3,4 @@ import DocumentationAlgo
 import AtomsCrowdReaderUI
 import AtomsAgentReaderUI
 import AtomsCrowdGeneratorUI
+import AtomsAttributesUI

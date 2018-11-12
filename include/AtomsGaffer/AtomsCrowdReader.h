@@ -37,6 +37,17 @@ class AtomsCrowdReader : public GafferScene::ObjectSource
 		void hashSource( const Gaffer::Context *context, IECore::MurmurHash &h ) const override;
 		IECore::ConstObjectPtr computeSource( const Gaffer::Context *context ) const override;
 
+		void hashAttributes( const SceneNode::ScenePath &path, const Gaffer::Context *context,
+		        const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const override;
+		IECore::ConstCompoundObjectPtr computeAttributes( const SceneNode::ScenePath &path,
+		        const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
+
+    private:
+
+        void getAtomsCacheName(
+                const std::string& filePath, std::string& cachePath,
+                std::string& cacheName, const std::string& extension) const;
+
 	private :
 
 		static size_t g_firstPlugIndex;

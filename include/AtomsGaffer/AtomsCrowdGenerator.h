@@ -5,6 +5,7 @@
 
 #include "GafferScene/BranchCreator.h"
 
+#include "Gaffer/PlugType.h"
 #include "Gaffer/StringPlug.h"
 
 namespace AtomsGaffer
@@ -28,6 +29,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 
 		Gaffer::StringPlug *attributesPlug();
 		const Gaffer::StringPlug *attributesPlug() const;
+
+		Gaffer::IntPlug *modePlug();
+		const Gaffer::IntPlug *modePlug() const;
 
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 

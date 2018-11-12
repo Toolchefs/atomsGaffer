@@ -7,11 +7,16 @@
 
 #include "GafferBindings/DependencyNodeBinding.h"
 
+#include "Atoms/Initialize.h"
+
 using namespace boost::python;
 using namespace GafferScene;
 
 BOOST_PYTHON_MODULE( _AtomsGaffer )
 {
+	// Initialize atoms lib
+	Atoms::initAtoms();
+
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdReader>();
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsAgentReader>();
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdGenerator>();

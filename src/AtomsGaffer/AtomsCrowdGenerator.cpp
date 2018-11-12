@@ -1,3 +1,4 @@
+#include <AtomsUtils/Logger.h>
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
 
 #include "IECoreScene/PointsPrimitive.h"
@@ -22,6 +23,7 @@ AtomsCrowdGenerator::AtomsCrowdGenerator( const std::string &name )
 	addChild( new StringPlug( "name", Plug::In, "agents" ) );
 	addChild( new ScenePlug( "agents" ) );
 	addChild( new StringPlug( "attributes", Plug::In ) );
+	addChild( new IntPlug( "mode" ) );
 
 	addChild( new AtomicCompoundDataPlug( "__agentChildNames", Plug::Out, new CompoundData ) );
 }
@@ -59,12 +61,22 @@ const Gaffer::StringPlug *AtomsCrowdGenerator::attributesPlug() const
 
 Gaffer::AtomicCompoundDataPlug *AtomsCrowdGenerator::agentChildNamesPlug()
 {
-	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 3 );
+	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 4);
 }
 
 const Gaffer::AtomicCompoundDataPlug *AtomsCrowdGenerator::agentChildNamesPlug() const
 {
-	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 3 );
+	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 4 );
+}
+
+Gaffer::IntPlug *AtomsCrowdGenerator::modePlug()
+{
+    return getChild<IntPlug>( g_firstPlugIndex + 3 );
+}
+
+const Gaffer::IntPlug *AtomsCrowdGenerator::modePlug() const
+{
+    return getChild<IntPlug>( g_firstPlugIndex + 3 );
 }
 
 void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
@@ -128,11 +140,13 @@ void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::C
 	{
 		inPlug()->objectPlug()->hash( h );
 		h.append( agentsPlug()->childNamesHash( ScenePath() ) );
+		modePlug()->hash( h );
 	}
 }
 
 void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "compute";
 	// The instanceChildNamesPlug is evaluated in a context in which
 	// scene:path holds the parent path for a branch.
 	if( output == agentChildNamesPlug() )
@@ -152,25 +166,27 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 			InternedStringVectorDataPtr instanceChildNames = new InternedStringVectorData;
 			result->writable()[instanceName] = instanceChildNames;
 			indexedAgentChildNames.push_back( &instanceChildNames->writable() );
+			AtomsUtils::Logger::info() << "agent name " << instanceName;
 		}
 
 		ConstPointsPrimitivePtr crowd = runTimeCast<const PointsPrimitive>( inPlug()->objectPlug()->getValue() );
 		if( !crowd )
 		{
-			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive." );
+			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
 		}
 
 		const auto agentType = crowd->variables.find( "agentType" );
-		if( agentType == crowd->variables.end() || !agentType->second.indices )
+		if( agentType == crowd->variables.end() )
 		{
 			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"agentType\" vertex variable" );
 		}
 
-		const auto &indices = agentType->second.indices->readable();
+		auto agentTypesData = runTimeCast<const StringVectorData>(agentType->second.data);
+		auto& agentTypeVec = agentTypesData->readable();
 		for( size_t i = 0, e = crowd->getNumPoints(); i < e; ++i )
 		{
-			size_t agentIndex = indices[i] % indexedAgentChildNames.size();
-			indexedAgentChildNames[agentIndex]->push_back( InternedString( i ) );
+			//size_t agentIndex = indices[i] % indexedAgentChildNames.size();
+			//indexedAgentChildNames[agentIndex]->push_back( InternedString( i ) );
 		}
 
 		static_cast<AtomicCompoundDataPlug *>( output )->setValue( result );
@@ -218,6 +234,7 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 }
 Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchBound";
 	if( branchPath.size() < 2 )
 	{
 		// "/" or "/agents"
@@ -272,6 +289,7 @@ void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, cons
 }
 Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchTransform";
 	if( branchPath.size() <= 2 )
 	{
 		// "/" or "/agents" or "/agents/<agentName>"
@@ -325,6 +343,7 @@ void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, con
 }
 ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchAttributes";
 	if( branchPath.size() <= 2 )
 	{
 		// "/" or "/agents" or "/agents/<agentName>"
@@ -368,6 +387,7 @@ void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const S
 
 ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchObject";
 	if( branchPath.size() <= 2 )
 	{
 		// "/" or "/agents" or "/agents/<agentName>"
@@ -410,6 +430,7 @@ void AtomsCrowdGenerator::hashBranchChildNames( const ScenePath &parentPath, con
 }
 ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchChildNames";
 	if( branchPath.empty() )
 	{
 		// "/"
@@ -431,6 +452,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 	{
 		// "/agents/<agentName>"
 		IECore::ConstCompoundDataPtr children = agentChildNames( parentPath, context );
+		AtomsUtils::Logger::info() << "computeBranchChildNames Child names" << children << " " << branchPath.back();
 		return children->member<InternedStringVectorData>( branchPath.back() );
 	}
 	else
@@ -461,7 +483,13 @@ void AtomsCrowdGenerator::hashBranchSet( const ScenePath &parentPath, const Inte
 }
 ConstPathMatcherDataPtr AtomsCrowdGenerator::computeBranchSet( const ScenePath &parentPath, const InternedString &setName, const Gaffer::Context *context ) const
 {
+    AtomsUtils::Logger::info() << "computeBranchSet";
 	ConstInternedStringVectorDataPtr agentNames = agentsPlug()->childNames( ScenePath() );
+	if (agentNames->readable().size() == 0)
+	{
+		AtomsUtils::Logger::info() << "Reading default agent type data";
+	}
+
 	IECore::ConstCompoundDataPtr instanceChildNames = agentChildNames( parentPath, context );
 	ConstPathMatcherDataPtr inputSet = agentsPlug()->setPlug()->getValue();
 

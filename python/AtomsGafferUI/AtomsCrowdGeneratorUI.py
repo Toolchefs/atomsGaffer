@@ -77,6 +77,22 @@ Gaffer.Metadata.registerNode(
 
         ],
 
+        "mode" : [
+
+            "description",
+            """
+            Compute mode
+             0 - Hierarchy of the full crowd, including per-agent locations (with geometry)
+             1 - Hierarchy of the full crowd, including per-agent locations (no geometry)
+             2 - Hierarchy of the full crowd, terminating at the start of each agent (with capsules)
+                A Capsule is akin to an on-the-fly procedural, or Houdini packed-prim
+             3 - Hierarchy of the full crowd, terminating at the start of each agent (no geometry)
+             4 - Hierarchy of the full crowd, terminating at the start of each agent (one point per agent)
+                A single location point cloud of the entire crowd (each point represents one agent)
+                Per-Agent skeleton representation of the crowd (one location per agent, one point &
+            """
+        ],
+
     },
 
 )

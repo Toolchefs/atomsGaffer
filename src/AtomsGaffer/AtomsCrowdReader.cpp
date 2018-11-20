@@ -3,7 +3,10 @@
 
 #include "IECoreScene/PointsPrimitive.h"
 
+#include "IECore/NullObject.h"
+
 #include "AtomsUtils/PathSolver.h"
+#include "AtomsUtils/Utils.h"
 #include "Atoms/AtomsCache.h"
 #include "AtomsCore/Metadata/MetadataTypeIds.h"
 #include "AtomsCore/Metadata/IntMetadata.h"
@@ -27,6 +30,7 @@
 #include "AtomsCore/Poser.h"
 #include "Atoms/GlobalNames.h"
 
+
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsCrowdReader );
 
 using namespace IECore;
@@ -34,6 +38,232 @@ using namespace IECoreScene;
 using namespace Gaffer;
 using namespace GafferScene;
 using namespace AtomsGaffer;
+
+class AtomsCrowdReader::EngineData : public Data
+{
+
+public :
+
+    EngineData(const std::string& filePath, float frame, const std::string& agentIdsStr):
+            m_filePath(filePath),
+            m_frame(frame)
+    {
+        m_frame = frame;
+        std::string cachePath, cacheName;
+        getAtomsCacheName( filePath, cachePath, cacheName, "atoms" );
+
+        if( !m_cache.openCache( cachePath, cacheName ) )
+        {
+            return;
+        }
+
+        m_frame = m_frame < m_cache.startFrame() ? m_cache.startFrame() : m_frame;
+        m_frame = m_frame > m_cache.endFrame() ? m_cache.endFrame() : m_frame;
+
+        int cacheFrame = static_cast<int>( m_frame );
+        double frameReminder = m_frame - cacheFrame;
+
+        m_cache.loadFrameHeader( cacheFrame );
+
+        // filter agents
+        std::vector<int> agentsIds;
+        parseVisibleAgents(agentsIds, agentIdsStr);
+        if (agentsIds.size() > 0) {
+            m_cache.setAgentsToLoad(agentsIds);
+            m_agentIds = agentsIds;
+        }
+        else
+        {
+            m_agentIds = m_cache.agentIds(cacheFrame);
+        }
+
+        m_cache.loadFrame( cacheFrame );
+        if (frameReminder > 0.0)
+            m_cache.loadNextFrame( cacheFrame + 1 );
+
+        for( size_t i = 0; i < m_agentIds.size(); ++i )
+        {
+            size_t agentId = m_agentIds[i];
+            // load in memory the agent type since the cache need this to interpolate the pose
+            const std::string &agentTypeName = m_cache.agentType(frame, agentId);
+            m_cache.loadAgentType(agentTypeName, false);
+        }
+    }
+
+    void hash( MurmurHash &h ) const override
+    {
+        h.append(m_filePath);
+        h.append(m_frame);
+    }
+
+    double frame() const
+    {
+        return m_frame;
+    }
+
+    const std::vector<int>& agentIds() const
+    {
+        return m_agentIds;
+    }
+
+    const Atoms::AtomsCache& cache() const
+    {
+        return m_cache;
+    }
+
+    void getAtomsCacheName(const std::string& filePath, std::string& cachePath, std::string& cacheName, const std::string& extension) const
+    {
+        size_t found = filePath.find_last_of( "/\\" );
+        std::string folderPath = filePath.substr( 0, found );
+
+        cachePath = filePath;
+        std::string fullPath = cachePath;
+        fullPath = AtomsUtils::solvePath( fullPath );
+        std::replace( fullPath.begin(), fullPath.end(), '\\', '/' );
+
+        const size_t lastSlashIdx = fullPath.rfind( '/' );
+        if ( std::string::npos != lastSlashIdx )
+        {
+
+            cacheName = fullPath.substr( lastSlashIdx + 1, fullPath.length() );
+            const size_t lastDotIdx = cacheName.rfind( '.' );
+            if (!(std::string::npos == lastDotIdx || cacheName.substr( lastDotIdx + 1, cacheName.length() ) != extension))
+            {
+                const size_t firstDotIdx = cacheName.find( '.' );
+                cacheName = cacheName.substr( 0, firstDotIdx );
+                cachePath = fullPath.substr( 0, lastSlashIdx );
+            }
+            else
+            {
+                cacheName = "";
+            }
+        }
+    }
+
+    void parseVisibleAgents(std::vector<int>& agentsFiltered, const std::string& agentIdsStr)
+    {
+        std::vector<std::string> idsEntryStr;
+        AtomsUtils::splitString(agentIdsStr, ',', idsEntryStr);
+        std::vector<int> idsToRemove;
+        std::vector<int> idsToAdd;
+
+        std::vector<int> agentIds = m_cache.agentIds(m_cache.currentFrame());
+        std::sort(agentIds.begin(), agentIds.end());
+        for (unsigned int eId = 0; eId < idsEntryStr.size(); eId++)
+        {
+            std::string currentStr = idsEntryStr[eId];
+            currentStr = AtomsUtils::eraseFromString(currentStr, ' ');
+            if (currentStr.length() == 0)
+            {
+                continue;
+            }
+
+            std::vector<int>* currentIdArray = &idsToAdd;
+            // is a remove id
+            if (currentStr[0] == '!')
+            {
+                currentIdArray = &idsToRemove;
+                currentStr = currentStr.substr(1, currentStr.length());
+            }
+
+            //remove all the parenthesis
+            currentStr = AtomsUtils::eraseFromString(currentStr, '(');
+            currentStr = AtomsUtils::eraseFromString(currentStr, ')');
+
+            // is a range
+            if (currentStr.find('-') != std::string::npos)
+            {
+                std::vector<std::string> rangeEntryStr;
+                AtomsUtils::splitString(currentStr, '-', rangeEntryStr);
+
+                int startRange = 0;
+                int endRange = 0;
+                if (rangeEntryStr.size() > 0)
+                {
+                    startRange = atoi(rangeEntryStr[0].c_str());
+
+                    if (rangeEntryStr.size() > 1)
+                    {
+                        endRange = atoi(rangeEntryStr[1].c_str());
+                        if (startRange < endRange)
+                        {
+                            for (unsigned int rId = startRange; rId <= endRange; rId++)
+                            {
+                                currentIdArray->push_back(rId);
+                            }
+                        }
+                    }
+                }
+            }
+            else
+            {
+                int tmpId = atoi(currentStr.c_str());
+                currentIdArray->push_back(tmpId);
+            }
+        }
+
+        agentsFiltered.clear();
+        std::sort(idsToAdd.begin(), idsToAdd.end());
+        std::sort(idsToRemove.begin(), idsToRemove.end());
+        if (idsToAdd.size() > 0)
+        {
+            std::vector<int> validIds;
+            std::set_intersection(
+                    agentIds.begin(), agentIds.end(),
+                    idsToAdd.begin(), idsToAdd.end(),
+                    std::back_inserter(validIds)
+            );
+
+
+            std::set_difference(
+                    validIds.begin(), validIds.end(),
+                    idsToRemove.begin(), idsToRemove.end(),
+                    std::back_inserter(agentsFiltered)
+            );
+        }
+        else
+        {
+            std::set_difference(
+                    agentIds.begin(), agentIds.end(),
+                    idsToRemove.begin(), idsToRemove.end(),
+                    std::back_inserter(agentsFiltered)
+            );
+        }
+    }
+
+protected :
+
+    void copyFrom( const Object *other, CopyContext *context ) override
+    {
+        Data::copyFrom( other, context );
+        msg( Msg::Warning, "EngineData::copyFrom", "Not implemented" );
+    }
+
+    void save( SaveContext *context ) const override
+    {
+        Data::save( context );
+        msg( Msg::Warning, "EngineData::save", "Not implemented" );
+    }
+
+    void load( LoadContextPtr context ) override
+    {
+        Data::load( context );
+        msg( Msg::Warning, "EngineData::load", "Not implemented" );
+    }
+
+private :
+
+    Atoms::AtomsCache m_cache;
+
+    std::string m_filePath;
+
+    std::vector<int> m_agentIds;
+
+    float m_frame;
+
+
+
+};
 
 size_t AtomsCrowdReader::g_firstPlugIndex = 0;
 
@@ -43,7 +273,10 @@ AtomsCrowdReader::AtomsCrowdReader( const std::string &name )
 	storeIndexOfNextChild( g_firstPlugIndex );
 
 	addChild( new StringPlug( "atomsSimFile" ) );
+    addChild( new StringPlug( "agentIds" ) );
+    addChild( new FloatPlug( "timeOffset" ) );
 	addChild( new IntPlug( "refreshCount" ) );
+    addChild( new ObjectPlug( "__engine", Plug::Out, NullObject::defaultNullObject() ) );
 }
 
 StringPlug* AtomsCrowdReader::atomsSimFilePlug()
@@ -56,25 +289,61 @@ const StringPlug* AtomsCrowdReader::atomsSimFilePlug() const
 	return getChild<StringPlug>( g_firstPlugIndex );
 }
 
+Gaffer::StringPlug *AtomsCrowdReader::agentIdsPlug()
+{
+return getChild<StringPlug>( g_firstPlugIndex + 1 );
+}
+
+const Gaffer::StringPlug *AtomsCrowdReader::agentIdsPlug() const
+{
+    return getChild<StringPlug>( g_firstPlugIndex  + 1 );
+}
+
+Gaffer::FloatPlug *AtomsCrowdReader::timeOffsetPlug()
+{
+    return getChild<FloatPlug>( g_firstPlugIndex  + 2 );
+}
+
+const Gaffer::FloatPlug *AtomsCrowdReader::timeOffsetPlug() const
+{
+    return getChild<FloatPlug>( g_firstPlugIndex  + 2 );
+}
+
 IntPlug* AtomsCrowdReader::refreshCountPlug()
 {
-	return getChild<IntPlug>( g_firstPlugIndex + 1 );
+	return getChild<IntPlug>( g_firstPlugIndex + 3 );
 }
 
 const IntPlug* AtomsCrowdReader::refreshCountPlug() const
 {
-	return getChild<IntPlug>( g_firstPlugIndex + 1 );
+	return getChild<IntPlug>( g_firstPlugIndex + 3 );
 }
+
+Gaffer::ObjectPlug *AtomsCrowdReader::enginePlug()
+{
+    return getChild<ObjectPlug>( g_firstPlugIndex + 4 );
+}
+
+const Gaffer::ObjectPlug *AtomsCrowdReader::enginePlug() const
+{
+    return getChild<ObjectPlug>( g_firstPlugIndex + 4 );
+}
+
 
 void AtomsCrowdReader::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
+
 	ObjectSource::affects( input, outputs );
 
-	if( input == atomsSimFilePlug() || input == refreshCountPlug() )
+	if( input == atomsSimFilePlug() || input == refreshCountPlug() || input == agentIdsPlug() || input == timeOffsetPlug())
+    {
+	    outputs.push_back( enginePlug() );
+    }
+
+	if (input == enginePlug())
 	{
-		outputs.push_back( sourcePlug() );
         outputs.push_back( sourcePlug() );
-        outputs.push_back(outPlug()->attributesPlug());
+        outputs.push_back( outPlug()->attributesPlug() );
 	}
 }
 
@@ -82,94 +351,134 @@ void AtomsCrowdReader::hashSource( const Gaffer::Context *context, MurmurHash &h
 {
 	atomsSimFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
+	timeOffsetPlug()->hash( h );
+    agentIdsPlug()->hash( h );
 	outPlug()->attributesPlug()->hash( h );
 	h.append( context->getFrame() );
 }
 
 ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context ) const
 {
-    auto cacheDataPtr = outPlug()->attributesPlug()->getValue();
-    if (!cacheDataPtr)
+    ConstEngineDataPtr engineData = boost::static_pointer_cast<const EngineData>( enginePlug()->getValue() );
+    if ( !engineData )
     {
         PointsPrimitivePtr points = new PointsPrimitive( );
         return points;
     }
 
+    double frame = engineData->frame();
+    auto& atomsCache = engineData->cache();
+    //extract the ids, variation, lod, position, direction and velocity and bbox and store them on points
 
-    auto crowd = runTimeCast<const CompoundObject>( cacheDataPtr );
-    if( !crowd )
-    {
-        throw InvalidArgumentException( "AtomsCrowdReader : Empty attributes." );
-    }
+    auto& agentIds = engineData->agentIds();
+    size_t numAgents = agentIds.size();
 
-    auto agentIdsObj = crowd->members().find( "agentIds" );
-    if ( agentIdsObj == crowd->members().cend())
-    {
-        throw InvalidArgumentException( "AtomsCrowdReader : No agents found." );
-    }
-    auto agentIdsPtr = runTimeCast<const IntVectorData>(agentIdsObj->second.get());
-    if (!agentIdsPtr)
-    {
-        throw InvalidArgumentException( "AtomsCrowdReader : No agents found." );
-    }
-
-    auto agentIds = agentIdsPtr->readable();
 
     V3fVectorDataPtr positionData = new V3fVectorData;
     positionData->setInterpretation( IECore::GeometricData::Interpretation::Point );
     auto &positions = positionData->writable();
-    positions.resize( agentIds.size() );
+    positions.resize( numAgents );
 
     IntVectorDataPtr agentCacheIdsData = new IntVectorData;
-    agentCacheIdsData->writable() = agentIdsPtr->readable();
+    agentCacheIdsData->writable() = agentIds;
 
     StringVectorDataPtr agentTypesData = new StringVectorData;
     auto &agentTypes = agentTypesData->writable();
-    agentTypes.resize( agentIds.size() );
+    agentTypes.resize( numAgents );
 
     StringVectorDataPtr agentVariationData = new StringVectorData;
     auto &agentVariations = agentVariationData->writable();
-    agentVariations.resize( agentIds.size() );
+    agentVariations.resize( numAgents );
 
     StringVectorDataPtr agentLodData = new StringVectorData;
     auto &agentLods = agentLodData->writable();
-    agentLods.resize( agentIds.size() );
+    agentLods.resize( numAgents);
+
+    V3fVectorDataPtr velocityData = new V3fVectorData;
+    auto &velocity = velocityData->writable();
+    velocity.resize( numAgents);
+
+    V3fVectorDataPtr directionData = new V3fVectorData;
+    auto &direction = directionData->writable();
+    direction.resize( numAgents);
+
+    Box3fVectorDataPtr boundingBoxData = new Box3fVectorData;
+    auto &boundingBox = boundingBoxData->writable();
+    boundingBox.resize( numAgents);
+
+    M44fVectorDataPtr rootMatrixData = new M44fVectorData;
+    auto &rootMatrix = rootMatrixData->writable();
+    rootMatrix.resize( numAgents);
 
 
-    for( size_t i = 0; i < agentIds.size(); ++i )
+    auto& atomsAgentTypes = atomsCache.agentTypes();
+    for( size_t i = 0; i < numAgents; ++i )
     {
-        auto agentObj = crowd->members().find( std::to_string( agentIds[i] ) );
-        if(agentObj == crowd->members().cend())
-            continue;
+        CompoundDataPtr agentCompoundData = new CompoundData;
+        auto &agentCompound = agentCompoundData->writable();
+        size_t agentId = agentIds[i];
 
-        auto agentDataPtr = runTimeCast<const CompoundData>(agentObj->second.get());
-        if (!agentDataPtr)
+        // load in memory the agent type since the cache need this to interpolate the pose
+        const std::string &agentTypeName = atomsCache.agentType( frame, agentId );
+        agentTypes[i] = agentTypeName;
+
+        AtomsCore::Pose pose;
+        atomsCache.loadAgentPose( frame, agentId, pose );
+        AtomsCore::MapMetadata metadata;
+        atomsCache.loadAgentMetadata( frame, agentId, metadata );
+
+        auto variationMetadata = metadata.getTypedEntry<AtomsCore::StringMetadata>(ATOMS_AGENT_VARIATION);
+        agentVariations[i] = variationMetadata ? variationMetadata->get() : "";
+
+        auto lodMetadata = metadata.getTypedEntry<AtomsCore::StringMetadata>(ATOMS_AGENT_LOD);
+        agentLods[i] = lodMetadata ? lodMetadata->get(): "";
+
+        auto directionMetadata = metadata.getTypedEntry<AtomsCore::Vector3Metadata>(ATOMS_AGENT_DIRECTION);
+        if (directionMetadata)
         {
-            continue;
+            auto& v = directionMetadata->get();
+            auto& vOut = direction[i];
+            vOut.x = v.x;
+            vOut.y = v.y;
+            vOut.z = v.z;
         }
 
-        const CompoundData* posePtr = agentDataPtr->member<const CompoundData>("metadata");
-        if (!posePtr)
+
+        auto velocityMetadata = metadata.getTypedEntry<AtomsCore::Vector3Metadata>(ATOMS_AGENT_VELOCITY);
+        if (velocityMetadata)
         {
-            continue;
+            auto& v = velocityMetadata->get();
+            auto& vOut = velocity[i];
+            vOut.x = v.x;
+            vOut.y = v.y;
+            vOut.z = v.z;
         }
 
-        auto posDataPtr = posePtr->member<const V3dDataBase>("position");
-        if (posDataPtr)
-            positions[i] = posDataPtr->readable();
 
-        auto variationDataPtr = posePtr->member<const StringData>(ATOMS_AGENT_VARIATION);
-        if (variationDataPtr)
-            agentVariations[i] = variationDataPtr->readable();
+        AtomsCore::Box3 bbox;
+        atomsCache.loadAgentBoundingBox( frame, agentId, bbox );
+        auto& bbOut = boundingBox[i];
+        bbOut.min.x = bbox.min.x;
+        bbOut.min.y = bbox.min.y;
+        bbOut.min.z = bbox.min.z;
 
-        auto lodDataPtr = posePtr->member<const StringData>(ATOMS_AGENT_LOD);
-        if (lodDataPtr)
-            agentLods[i] = lodDataPtr->readable();
+        bbOut.max.x = bbox.max.x;
+        bbOut.max.y = bbox.max.y;
+        bbOut.max.z = bbox.max.z;
 
-        auto aTypePtr = agentDataPtr->member<const StringData>("agentType");
-        if (!aTypePtr)
-        {
-            agentTypes[i] = aTypePtr->readable();
+        if ( pose.numJoints() > 0 ) {
+            auto agentTypePtr = atomsAgentTypes.agentType( agentTypeName );
+            if (agentTypePtr)
+            {
+                AtomsCore::Poser poser(&agentTypePtr->skeleton());
+                auto matrices = poser.getAllWorldMatrix(pose);
+                if (matrices.size() > 0) {
+                    positions[i] = matrices[0].translation();
+                    rootMatrix[i] = Imath::M44f(matrices[0]);
+                }
+            } else {
+                positions[i] = pose.jointPose(0).translation;
+            }
         }
     }
 
@@ -178,94 +487,61 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     points->variables["variation"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentVariationData);
     points->variables["lod"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentLodData);
     points->variables["agentId"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsData);
+    points->variables["velocity"] = PrimitiveVariable( PrimitiveVariable::Vertex, velocityData);
+    points->variables["direction"] = PrimitiveVariable( PrimitiveVariable::Vertex, directionData);
+    // For now don't save this since the ui inspector rises an exception
+    //points->variables["boundingBox"] = PrimitiveVariable( PrimitiveVariable::Vertex, boundingBoxData);
+    //points->variables["rootMatrix"] = PrimitiveVariable( PrimitiveVariable::Vertex, rootMatrixData);
     return points;
-}
 
-void AtomsCrowdReader::getAtomsCacheName(const std::string& filePath, std::string& cachePath, std::string& cacheName, const std::string& extension) const
-{
-    size_t found = filePath.find_last_of( "/\\" );
-    std::string folderPath = filePath.substr( 0, found );
-
-    cachePath = filePath;
-    std::string fullPath = cachePath;
-    fullPath = AtomsUtils::solvePath( fullPath );
-    std::replace( fullPath.begin(), fullPath.end(), '\\', '/' );
-
-    const size_t lastSlashIdx = fullPath.rfind( '/' );
-    if ( std::string::npos != lastSlashIdx )
-    {
-
-        cacheName = fullPath.substr( lastSlashIdx + 1, fullPath.length() );
-        const size_t lastDotIdx = cacheName.rfind( '.' );
-        if (!(std::string::npos == lastDotIdx || cacheName.substr( lastDotIdx + 1, cacheName.length() ) != extension))
-        {
-            const size_t firstDotIdx = cacheName.find( '.' );
-            cacheName = cacheName.substr( 0, firstDotIdx );
-            cachePath = fullPath.substr( 0, lastSlashIdx );
-        }
-        else
-        {
-            cacheName = "";
-        }
-    }
 }
 
 void AtomsCrowdReader::hashAttributes( const ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const
 {
     atomsSimFilePlug()->hash( h );
+    refreshCountPlug()->hash( h );
+    timeOffsetPlug()->hash( h );
+    agentIdsPlug()->hash( h );
     h.append( context->getFrame() );
 }
 
 IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneNode::ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const
 {
-    std::string atomsSimFile = atomsSimFilePlug()->getValue();
+    ConstEngineDataPtr engineData = boost::static_pointer_cast<const EngineData>( enginePlug()->getValue() );
 
-    // split sim file in path/name
-    std::string cachePath, cacheName;
-    getAtomsCacheName( atomsSimFile, cachePath, cacheName, "atoms" );
-
-    double frame = context->getFrame();
     IECore::CompoundObjectPtr result = new IECore::CompoundObject;
+    auto& members = result->members();
 
-    Atoms::AtomsCache atomsCache;
-    if( !atomsCache.openCache( cachePath, cacheName ) )
+    if (!engineData)
     {
         return result;
     }
 
-    frame = frame < atomsCache.startFrame() ? atomsCache.startFrame() : frame;
-    frame = frame > atomsCache.endFrame() ? atomsCache.endFrame() : frame;
+    auto& atomsCache = engineData->cache();
+    double frame = engineData->frame();
 
-    int cacheFrame = static_cast<int>( frame );
-    double frameReminder = frame - cacheFrame;
-
-    atomsCache.loadFrameHeader( cacheFrame );
-
-    atomsCache.loadFrame( cacheFrame );
-    if (frameReminder > 0.0)
-        atomsCache.loadNextFrame( cacheFrame + 1 );
-
-    auto agentIds = atomsCache.agentIds( cacheFrame );
+    auto& agentIds = engineData->agentIds();
     size_t numAgents = agentIds.size();
 
     auto& translator = AtomsMetadataTranslator::instance();
 
     Box3dDataPtr cacheBox = new Box3dData;
     atomsCache.loadBoundingBox( frame, cacheBox->writable() );
-    result->members()["boundingBox"] = cacheBox;
+    members["boundingBox"] = cacheBox;
 
     IntVectorDataPtr agentIndices = new IntVectorData;
     agentIndices->writable() = agentIds;
-    result->members()["agentIds"] = agentIndices;
-
+    members["agentIds"] = agentIndices;
+    auto& atomsAgentTypes = atomsCache.agentTypes();
     for( size_t i = 0; i < numAgents; ++i )
     {
-        CompoundDataPtr agentCompound = new CompoundData;
+        CompoundDataPtr agentCompoundData = new CompoundData;
+        auto &agentCompound = agentCompoundData->writable();
         size_t agentId = agentIds[i];
 
         // load in memory the agent type since the cache need this to interpolate the pose
         const std::string &agentTypeName = atomsCache.agentType( frame, agentId );
-        auto agentTypePtr = atomsCache.loadAgentType( agentTypeName, false );
+        auto agentTypePtr = atomsAgentTypes.agentType( agentTypeName );
 
         AtomsPtr<AtomsCore::PoseMetadata> posePtr( new AtomsCore::PoseMetadata );
         atomsCache.loadAgentPose( frame, agentId, posePtr->get() );
@@ -277,7 +553,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         {
             AtomsCore::Poser poser(&agentTypePtr->skeleton());
             M44dVectorDataPtr matricesData = new M44dVectorData;
-            matricesData->writable()= poser.getAllWorldMatrix(posePtr->get());
+            M44dVectorDataPtr normalMatricesData = new M44dVectorData;
 
             //update the position metadata
             auto positionMeta = metadataPtr->getTypedEntry<AtomsCore::Vector3Metadata>(ATOMS_AGENT_POSITION);
@@ -285,28 +561,71 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             {
                 positionMeta->set(matricesData->readable()[0].translation());
             }
-            agentCompound->writable()["poseWorldMatrices"] = matricesData;
+
+            //get the root world matrix
+            auto rootMatrix = poser.getWorldMatrix(posePtr->get(), 0);
+            //now for all the detached joint multiply transform in root local space
+            AtomsCore::Matrix rootInverseMatrix = rootMatrix.inverse();
+            const std::vector<unsigned short>& detachedJoints = agentTypePtr->skeleton().detachedJoints();
+            for (unsigned int ii = 0; ii < agentTypePtr->skeleton().detachedJoints().size(); ii++)
+            {
+                poser.setWorldMatrix(posePtr->get(), poser.getWorldMatrix(posePtr->get(), detachedJoints[ii]) * rootInverseMatrix, detachedJoints[ii]);
+            }
+
+            auto& outMatrices = matricesData->writable();
+            auto& outNormalMatrices = normalMatricesData->writable();
+            outMatrices = poser.getAllWorldMatrix(posePtr->get());
+            outNormalMatrices.resize(outMatrices.size());
+            /*
+            if (outMatrices.size() == 0)
+            {
+                AtomsUtils::Logger::error() << "no matrices found for agent " << agentId;
+                break;
+            }
+             */
+
+            const AtomsCore::MapMetadata& metadata = agentTypePtr->metadata();
+            AtomsPtr<const AtomsCore::MatrixArrayMetadata> bindPosesInvPtr = metadata.getTypedEntry<const AtomsCore::MatrixArrayMetadata>("worldBindPoseInverseMatrices");
+            const std::vector<AtomsCore::Matrix>& bindPosesInv = bindPosesInvPtr->get();
+
+            for (unsigned int j = 0; j < outMatrices.size(); j++) {
+                AtomsCore::Matrix &jMtx = outMatrices[j];
+                jMtx = bindPosesInv[j] * jMtx;
+                outNormalMatrices[j] = jMtx.inverse().transpose();
+            }
+
+            agentCompound["poseWorldMatrices"] = matricesData;
+            agentCompound["poseNormalWorldMatrices"] = normalMatricesData;
+
+            M44dDataPtr rootMatrixData = new M44dData(rootMatrix);
+            agentCompound["rootMatrix"] = rootMatrixData;
+
+            UInt64DataPtr hashData = new UInt64Data(posePtr->get().hash());
+            agentCompound["hash"] = hashData;
+            ;
         }
-        agentCompound->writable()["pose"] = translator.translate( posePtr );
+        //agentCompound["pose"] = translator.translate( posePtr );
 
 
-        agentCompound->writable()["metadata"] = translator.translate(metadataPtr);
+        agentCompound["metadata"] = translator.translate(metadataPtr);
 
 
         Box3dDataPtr agentBBox = new Box3dData;
         atomsCache.loadAgentBoundingBox( frame, agentId, agentBBox->writable() );
-        agentCompound->writable()["boundingBox"] = agentBBox;
+        agentCompound["boundingBox"] = agentBBox;
 
         StringDataPtr aTypeData = new StringData();
-        agentCompound->writable()["agentType"] = aTypeData;
+        aTypeData->writable() = agentTypeName;
+        agentCompound["agentType"] = aTypeData;
 
-        result->members()[ std::to_string( agentId ) ] = agentCompound;
+        members[ std::to_string( agentId ) ] = agentCompoundData;
     }
 
     // store also the agent types inside the compound
     auto& agentTypes = atomsCache.agentTypes();
     auto agentTypeNames = agentTypes.agentTypeNames();
-    CompoundDataPtr agentTypesCompound = new CompoundData;
+    CompoundDataPtr agentTypesCompoundData = new CompoundData;
+    auto &agentTypesCompound = agentTypesCompoundData->writable();
     for ( size_t i = 0; i < agentTypeNames.size(); ++i )
     {
         const std::string& name = agentTypeNames[i];
@@ -315,14 +634,15 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         if (!agentType)
             continue;
 
-        CompoundDataPtr agentTypeCompound = new CompoundData;
+        CompoundDataPtr agentTypeCompoundData = new CompoundData;
+        auto &agentTypeCompound = agentTypeCompoundData->writable();
 
         //store the bind world matrices
         auto& skeleton = agentType->skeleton();
         AtomsCore::Poser poser(&skeleton);
         M44dVectorDataPtr worldBindMatrices = new M44dVectorData;
         worldBindMatrices->writable() = poser.getAllWorldBindMatrix();
-        agentTypeCompound->writable()["worldBindMatrices"] = worldBindMatrices;
+        agentTypeCompound["worldBindMatrices"] = worldBindMatrices;
 
         M44dVectorDataPtr bindMatrices = new M44dVectorData;
         auto& bindMtxVec = worldBindMatrices->writable();
@@ -331,7 +651,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         {
             bindMtxVec[jId] = skeleton.joint( jId ).matrix();
         }
-        agentTypeCompound->writable()["bindMatrices"] = bindMatrices;
+        agentTypeCompound["bindMatrices"] = bindMatrices;
 
 
         CompoundDataPtr agentTypeMetadataCompound = new CompoundData;
@@ -345,12 +665,42 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             if (object)
                 agentTypeMetadataCompound->writable()[it->first] = object;
         }
-        agentTypeCompound->writable()["metadata"] = agentTypeMetadataCompound;
+        //agentTypeCompound["metadata"] = agentTypeMetadataCompound;
 
-        agentTypesCompound->writable()[name] = agentTypeCompound;
+        agentTypesCompound[name] = agentTypeCompoundData;
     }
 
-    result->members()["agentTypes"] = agentTypesCompound;
+    members["agentTypes"] = agentTypesCompoundData;
 
     return result;
+}
+
+void AtomsCrowdReader::hash( const Gaffer::ValuePlug *output, const Gaffer::Context *context, IECore::MurmurHash &h ) const
+{
+    if( output == enginePlug() )
+    {
+        atomsSimFilePlug()->hash( h );
+        refreshCountPlug()->hash( h );
+        timeOffsetPlug()->hash( h );
+        agentIdsPlug()->hash( h );
+        h.append(context->getFrame());
+    }
+
+    if ( output == sourcePlug())
+    {
+        enginePlug()->hash(h);
+        h.append(context->getFrame());
+    }
+    ObjectSource::hash( output, context, h );
+}
+
+void AtomsCrowdReader::compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const
+{
+    if (output == enginePlug()) {
+
+        static_cast<ObjectPlug *>( output )->setValue(new EngineData(atomsSimFilePlug()->getValue(), context->getFrame() + timeOffsetPlug()->getValue(), agentIdsPlug()->getValue()));
+        return;
+    }
+
+    ObjectSource::compute(output, context);
 }

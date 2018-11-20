@@ -7,6 +7,12 @@
 
 #include "Gaffer/StringPlug.h"
 
+#include "IECoreScene/SceneInterface.h"
+
+#include "Atoms/Variation/VariationLoader.h"
+
+#include "tbb/enumerable_thread_specific.h"
+
 namespace AtomsGaffer
 {
 
@@ -14,21 +20,24 @@ namespace AtomsGaffer
 // and load via the GafferScene::SceneReader. We're not doing
 // that yet because I'm not familiar enough with the various
 // file formats that Atoms provides.
-class AtomsAgentReader : public GafferScene::SceneNode
+class AtomsVariationReader : public GafferScene::SceneNode
 {
 
 	public:
 
-		AtomsAgentReader( const std::string &name = defaultName<AtomsAgentReader>() );
-		~AtomsAgentReader() = default;
+		AtomsVariationReader( const std::string &name = defaultName<AtomsVariationReader>() );
+		~AtomsVariationReader() = default;
 
-		IE_CORE_DECLARERUNTIMETYPEDEXTENSION( AtomsGaffer::AtomsAgentReader, TypeId::AtomsAgentReaderTypeId, GafferScene::SceneNode );
+		IE_CORE_DECLARERUNTIMETYPEDEXTENSION( AtomsGaffer::AtomsVariationReader, TypeId::AtomsVariationReaderTypeId, GafferScene::SceneNode );
 
 		Gaffer::StringPlug *atomsAgentFilePlug();
 		const Gaffer::StringPlug *atomsAgentFilePlug() const;
 
 		Gaffer::IntPlug *refreshCountPlug();
 		const Gaffer::IntPlug *refreshCountPlug() const;
+
+        Gaffer::ObjectPlug *enginePlug();
+        const Gaffer::ObjectPlug *enginePlug() const;
 
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 
@@ -42,6 +51,7 @@ class AtomsAgentReader : public GafferScene::SceneNode
 		void hashGlobals( const Gaffer::Context *context, const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const override;
 		void hashSetNames( const Gaffer::Context *context, const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const override;
 		void hashSet( const IECore::InternedString &setName, const Gaffer::Context *context, const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const override;
+        void hash( const Gaffer::ValuePlug *output, const Gaffer::Context *context, IECore::MurmurHash &h ) const;
 
 		Imath::Box3f computeBound( const ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
 		Imath::M44f computeTransform( const ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
@@ -51,8 +61,12 @@ class AtomsAgentReader : public GafferScene::SceneNode
 		IECore::ConstCompoundObjectPtr computeGlobals( const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
 		IECore::ConstInternedStringVectorDataPtr computeSetNames( const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
 		IECore::ConstPathMatcherDataPtr computeSet( const IECore::InternedString &setName, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
+        void compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const;
+
 
 	private :
+
+        IE_CORE_FORWARDDECLARE( EngineData );
 
 		static size_t g_firstPlugIndex;
 

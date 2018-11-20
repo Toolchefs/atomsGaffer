@@ -7,7 +7,7 @@ import DocumentationAlgo
 
 Gaffer.Metadata.registerNode(
 
-    AtomsGaffer.AtomsAgentReader,
+    AtomsGaffer.AtomsVariationReader,
 
     "description",
     """
@@ -30,8 +30,8 @@ Gaffer.Metadata.registerNode(
             "path:leaf", True,
             "path:valid", True,
             "path:bookmarks", "atoms",
-            "fileSystemPath:extensions", "atoms",
-            "fileSystemPath:extensionsLabel", "Show only Atoms files",
+            "fileSystemPath:extensions", "json",
+            "fileSystemPath:extensionsLabel", "Show only Json files",
             "layout:index", 0,
 
         ],

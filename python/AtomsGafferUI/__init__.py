@@ -1,6 +1,6 @@
 import DocumentationAlgo
 
 import AtomsCrowdReaderUI
-import AtomsAgentReaderUI
+import AtomsVariationReaderUI
 import AtomsCrowdGeneratorUI
 import AtomsAttributesUI

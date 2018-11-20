@@ -6,6 +6,7 @@
 #include "GafferScene/ObjectSource.h"
 
 #include "Gaffer/StringPlug.h"
+#include "Gaffer/NumericPlug.h"
 
 namespace AtomsGaffer
 {
@@ -27,8 +28,17 @@ class AtomsCrowdReader : public GafferScene::ObjectSource
 		Gaffer::StringPlug *atomsSimFilePlug();
 		const Gaffer::StringPlug *atomsSimFilePlug() const;
 
+        Gaffer::StringPlug *agentIdsPlug();
+        const Gaffer::StringPlug *agentIdsPlug() const;
+
+		Gaffer::FloatPlug *timeOffsetPlug();
+		const Gaffer::FloatPlug *timeOffsetPlug() const;
+
 		Gaffer::IntPlug *refreshCountPlug();
 		const Gaffer::IntPlug *refreshCountPlug() const;
+
+		Gaffer::ObjectPlug *enginePlug();
+		const Gaffer::ObjectPlug *enginePlug() const;
 
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 
@@ -42,13 +52,12 @@ class AtomsCrowdReader : public GafferScene::ObjectSource
 		IECore::ConstCompoundObjectPtr computeAttributes( const SceneNode::ScenePath &path,
 		        const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
 
-    private:
+		void hash( const Gaffer::ValuePlug *output, const Gaffer::Context *context, IECore::MurmurHash &h ) const override;
+		void compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const override;
 
-        void getAtomsCacheName(
-                const std::string& filePath, std::string& cachePath,
-                std::string& cacheName, const std::string& extension) const;
+	private:
 
-	private :
+		IE_CORE_FORWARDDECLARE( EngineData );
 
 		static size_t g_firstPlugIndex;
 

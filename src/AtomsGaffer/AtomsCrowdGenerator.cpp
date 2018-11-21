@@ -525,26 +525,6 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                 throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
             }
 
-            auto agentTypesCompound = crowd->member<const CompoundData>("agentTypes");
-            if (!agentTypesCompound)
-            {
-                throw InvalidArgumentException( "AtomsCrowdGenerator : No agent type found." );
-            }
-
-            auto agentTypeData = agentTypesCompound->member<const CompoundData>(branchPath[1]);
-            if (!agentTypeData)
-            {
-                throw InvalidArgumentException( "AtomsCrowdGenerator : No agent type found." );
-            }
-
-            auto worldBindMatricesData = agentTypeData->member<const M44dVectorData>("worldBindMatrices");
-            if (!worldBindMatricesData)
-            {
-                throw InvalidArgumentException( "AtomsCrowdGenerator : No agent type bind matrices found." );
-            }
-
-            auto &worldBindMatrices = worldBindMatricesData->readable();
-
 
             auto agentData = crowd->member<const CompoundData>(branchPath[3]);
             if( !agentData )
@@ -552,6 +532,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                 throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found." );
             }
 
+            auto metadataData = agentData->member<const CompoundData>("metadata");
             auto poseData = agentData->member<const M44dVectorData>("poseWorldMatrices");
             auto poseNormalData = agentData->member<const M44dVectorData>("poseNormalWorldMatrices");
             if (poseData && poseData->readable().size() > 0)
@@ -559,7 +540,122 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                 auto& worldMatrices = poseData->readable();
                 auto& worldNormalMatrices = poseNormalData->readable();
 
+
+
+
                 MeshPrimitivePtr result = meshPrim->copy();
+				auto meshPointData = runTimeCast<V3fVectorData>(result->variables["P"].data);
+				auto meshNormalData = runTimeCast<V3fVectorData>(result->variables["N"].data);
+                auto blendShapeCountDataIt = result->variables.find("blendShapeCount");
+
+                if (blendShapeCountDataIt != result->variables.end() && metadataData && meshPointData && meshNormalData)
+                {
+					auto &points = meshPointData->writable();
+					auto &normals = meshNormalData->writable();
+                	auto& metadataMap = metadataData->readable();
+                    auto blendShapeCountData = runTimeCast<IntData>(blendShapeCountDataIt->second.data);
+                    int numBlendShapes = blendShapeCountData->readable();
+
+                    std::vector<const std::vector<Imath::V3f>*> blendPoints;
+					std::vector<const std::vector<Imath::V3f>*> blendNormals;
+					std::vector<double> blendWeights;
+                    for (size_t blendId=0; blendId < numBlendShapes; ++blendId)
+					{
+						auto blendWeightDataIt = metadataMap.find(std::string(branchPath[1].c_str()) + "_" + std::string(branchPath.back().c_str()) +"_" + std::to_string(blendId));
+						if (blendWeightDataIt == metadataMap.cend())
+							continue;
+
+						auto blendWeightData = runTimeCast<const DoubleData>(blendWeightDataIt->second);
+						if (!blendWeightData)
+							continue;
+
+						double weight = blendWeightData->readable();
+
+						if (weight < 0.00001)
+						    continue;
+
+						auto blendPointsData = runTimeCast<V3fVectorData>(result->variables["blendShape_" + std::to_string(blendId) + "_P"].data);
+						if (!blendPointsData)
+							continue;
+
+						auto blendNormalsData = runTimeCast<V3fVectorData>(result->variables["blendShape_" + std::to_string(blendId) + "_N"].data);
+						if (!blendNormalsData)
+							continue;
+
+						auto& blendPointsVec = blendPointsData->readable();
+
+						if (blendPointsVec.size() != points.size())
+							continue;
+
+
+						auto& blendNormalsVec = blendNormalsData->readable();
+
+						if (blendNormalsVec.size() != normals.size())
+							continue;
+
+                        blendPoints.push_back(&blendPointsVec);
+						blendNormals.push_back(&blendNormalsVec);
+						blendWeights.push_back(weight);
+					}
+
+					for (size_t ptId=0; ptId < points.size(); ++ptId)
+                    {
+					    Imath::V3f currentPoint;
+					    auto& meshPoint = points[ptId];
+                        currentPoint.x = meshPoint.x;
+                        currentPoint.y = meshPoint.y;
+                        currentPoint.z = meshPoint.z;
+
+
+                        for (size_t blendId = 0; blendId < blendPoints.size(); blendId++)
+                        {
+                            auto& blendP = *blendPoints[blendId];
+                            double weight = blendWeights[blendId];
+                            currentPoint.x += (blendP[ptId].x - points[ptId].x) * weight;
+                            currentPoint.y += (blendP[ptId].y - points[ptId].y) * weight;
+                            currentPoint.z += (blendP[ptId].z - points[ptId].z) * weight;
+                        }
+
+                        meshPoint.x = currentPoint.x;
+                        meshPoint.y = currentPoint.y;
+                        meshPoint.z = currentPoint.z;
+                    }
+
+					for (size_t ptId=0; ptId < points.size(); ++ptId) {
+						Imath::V3f currentNormal;
+						auto &meshNormal = normals[ptId];
+						currentNormal.x = meshNormal.x;
+						currentNormal.y = meshNormal.y;
+						currentNormal.z = meshNormal.z;
+
+						Imath::V3f pNormals(currentNormal.x, currentNormal.y, currentNormal.z);
+						Imath::V3f  blendNormal(0.0, 0.0, 0.0);
+						size_t counterN = 0;
+
+						for (size_t blendId = 0; blendId < blendNormals.size(); blendId++)
+						{
+							auto &blendN = *blendNormals[blendId];
+							double weight = blendWeights[blendId];
+							blendNormal += pNormals * (1.0f - weight) +
+										   blendN[ptId] * weight;
+							counterN++;
+						}
+						if (counterN > 0) {
+							blendNormal = blendNormal / static_cast<float>(counterN);
+							blendNormal.normalize();
+							currentNormal.x = blendNormal.x;
+							currentNormal.y = blendNormal.y;
+							currentNormal.z = blendNormal.z;
+						}
+
+
+						meshNormal.x = currentNormal.x;
+						meshNormal.y = currentNormal.y;
+						meshNormal.z = currentNormal.z;
+					}
+
+                }
+
 
                 auto jointIndexCountData = meshAttributes->member<const IntVectorData>("jointIndexCount");
                 auto jointIndicesData = meshAttributes->member<const IntVectorData>("jointIndices");
@@ -645,13 +741,30 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                     }
                 }
 
-
+				// add metadata to the mesh prim
                 auto metaDataPtr = agentData->member<const CompoundData>("metadata");
                 if (metaDataPtr)
                 {
                     auto metaData = metaDataPtr->readable();
                     for (auto metaIt = metaData.cbegin(); metaIt != metaData.cend(); ++metaIt)
                     {
+                        if (metaIt->first == "id")
+                            continue;
+                        if (metaIt->second->typeId() == V3dData::staticTypeId())
+                        {
+                            V3fDataPtr vec3fData = new V3fData();
+                            auto vec3dData = runTimeCast<const V3dData>(metaIt->second);
+                            vec3fData->writable() = vec3dData->readable();
+                            continue;
+                        }
+                        if (metaIt->second->typeId() == DoubleData::staticTypeId())
+                        {
+                            FloatDataPtr fData = new FloatData();
+                            auto dData = runTimeCast<const DoubleData>(metaIt->second);
+                            fData->writable() = dData->readable();
+                            continue;
+                        }
+
                         result->variables[metaIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, metaIt->second);
                     }
                 }
@@ -660,7 +773,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         }
 
 
-        // add metadata to the mesh prim
+
 
 
 		return agentsPlug()->objectPlug()->getValue();

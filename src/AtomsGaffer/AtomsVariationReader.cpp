@@ -7,18 +7,21 @@
 
 #include "boost/lexical_cast.hpp"
 
+#include <functional>
+#include <unordered_map>
+
 #include "Atoms/Variations.h"
 #include "Atoms/Loaders/MeshLoader.h"
+#include "Atoms/GlobalNames.h"
 #include "AtomsUtils/PathSolver.h"
 #include "AtomsCore/Metadata/MeshMetadata.h"
 #include "AtomsCore/Metadata/Box3Metadata.h"
+#include "AtomsCore/Metadata/BoolMetadata.h"
+#include "AtomsCore/Metadata/ArrayMetadata.h"
+#include "AtomsCore/Metadata/IntArrayMetadata.h"
+#include "AtomsCore/Metadata/DoubleArrayMetadata.h"
+#include "AtomsCore/Metadata/Vector3ArrayMetadata.h"
 
-#include <functional>
-#include <unordered_map>
-#include <AtomsCore/Metadata/ArrayMetadata.h>
-#include <AtomsCore/Metadata/IntArrayMetadata.h>
-#include <AtomsCore/Metadata/DoubleArrayMetadata.h>
-#include <AtomsCore/Metadata/Vector3ArrayMetadata.h>
 
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsVariationReader );
 
@@ -165,6 +168,9 @@ MeshPrimitivePtr convertAtomsMesh(AtomsPtr<AtomsCore::MapMetadata>& geoMap)
             blendPts.insert(blendPts.begin(), blendP.begin(), blendP.end());
             meshPtr->variables["blendShape_" + std::to_string(blendId) + "_P"] =  PrimitiveVariable( PrimitiveVariable::Vertex, blendPointsData );
         }
+
+        IntDataPtr blendShapeCount = new IntData(blendShapes->size());
+        meshPtr->variables["blendShapeCount"] =  PrimitiveVariable( PrimitiveVariable::Constant, blendShapeCount );
     }
 
     auto atomsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>("atoms");
@@ -223,6 +229,19 @@ public :
                         continue;
 
                     auto geoMap = std::static_pointer_cast<AtomsCore::MapMetadata>(meshIt->second);
+                    AtomsPtr<const AtomsCore::MapMetadata> atomsMapPtr = geoMap->getTypedEntry<const AtomsCore::MapMetadata>("atoms");
+                    if (atomsMapPtr)
+                    {
+                        auto hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>(ATOMS_CLOTH_HIDE_MESH);
+                        if (hideMeshPtr && hideMeshPtr->value())
+                            continue;
+
+                        hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>(ATOMS_PREVIEW_MESH);
+                        if (hideMeshPtr && hideMeshPtr->value())
+                            continue;
+                    }
+
+
                     auto meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>("geo");
                     if (!meshMeta) {
                         meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>("cloth");
@@ -230,10 +249,14 @@ public :
                             continue;
                         }
                     }
+
                     for(const auto& p: meshMeta->get().points())
                         bbox.extendBy(p);
 
                 }
+
+                if (bbox.isEmpty())
+                    continue;
 
                 AtomsCore::Box3Metadata boxMeta;
                 boxMeta.get().extendBy(bbox.min);

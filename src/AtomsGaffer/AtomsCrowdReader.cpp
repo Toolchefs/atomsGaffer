@@ -606,7 +606,6 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         }
         //agentCompound["pose"] = translator.translate( posePtr );
 
-
         agentCompound["metadata"] = translator.translate(metadataPtr);
 
 
@@ -621,6 +620,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         members[ std::to_string( agentId ) ] = agentCompoundData;
     }
 
+    /*
     // store also the agent types inside the compound
     auto& agentTypes = atomsCache.agentTypes();
     auto agentTypeNames = agentTypes.agentTypeNames();
@@ -671,7 +671,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
     }
 
     members["agentTypes"] = agentTypesCompoundData;
-
+    */
     return result;
 }
 

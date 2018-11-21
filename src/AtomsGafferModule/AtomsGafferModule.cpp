@@ -36,7 +36,7 @@ public:
 
 	void error(const std::string &message) override
 	{
-		IECore::msg( IECore::Msg::Error, "Error", message );
+		IECore::msg( IECore::Msg::Error, "Atoms", message );
 	}
 
 	void cmd(const std::string &message)

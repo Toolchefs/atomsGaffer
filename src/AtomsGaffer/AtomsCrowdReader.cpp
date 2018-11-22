@@ -85,7 +85,7 @@ public :
         {
             size_t agentId = m_agentIds[i];
             // load in memory the agent type since the cache need this to interpolate the pose
-            const std::string &agentTypeName = m_cache.agentType(frame, agentId);
+            const std::string &agentTypeName = m_cache.agentType(m_frame, agentId);
             m_cache.loadAgentType(agentTypeName, false);
         }
     }
@@ -576,13 +576,6 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             auto& outNormalMatrices = normalMatricesData->writable();
             outMatrices = poser.getAllWorldMatrix(posePtr->get());
             outNormalMatrices.resize(outMatrices.size());
-            /*
-            if (outMatrices.size() == 0)
-            {
-                AtomsUtils::Logger::error() << "no matrices found for agent " << agentId;
-                break;
-            }
-             */
 
             const AtomsCore::MapMetadata& metadata = agentTypePtr->metadata();
             AtomsPtr<const AtomsCore::MatrixArrayMetadata> bindPosesInvPtr = metadata.getTypedEntry<const AtomsCore::MatrixArrayMetadata>("worldBindPoseInverseMatrices");
@@ -602,7 +595,10 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
             UInt64DataPtr hashData = new UInt64Data(posePtr->get().hash());
             agentCompound["hash"] = hashData;
-            ;
+        }
+        else
+        {
+            throw InvalidArgumentException("AtomsCrowdReader: Invalid agent type " + agentTypeName);
         }
         //agentCompound["pose"] = translator.translate( posePtr );
 

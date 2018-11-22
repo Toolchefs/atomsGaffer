@@ -219,7 +219,7 @@ public :
 
                 auto atomsGeoMap = Atoms::loadMesh(geoPtr->getGeometryFile(), geoPtr->getGeometryFilter());
                 if (!atomsGeoMap) {
-                    continue;
+                    throw InvalidArgumentException("AtomsVariationsReader: Invalid geo: " + geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter());
                 }
 
                 //compute the bouding box
@@ -420,12 +420,12 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
                 }
                 else
                 {
-                    AtomsUtils::Logger::info() << "No bound found for " << geoData->getGeometryFile() + ":" + geoData->getGeometryFilter();
+                    throw InvalidArgumentException("AtomsVariationsReader: No bound found for " + geoData->getGeometryFile() + ":" + geoData->getGeometryFilter());
                 }
             }
             else
             {
-                AtomsUtils::Logger::info() << "No bound found for " << geoData->getGeometryFile() + ":" + geoData->getGeometryFilter();
+                throw InvalidArgumentException("AtomsVariationsReader: No valid geo found " + geoData->getGeometryFile() + ":" + geoData->getGeometryFilter());
             }
         }
     }
@@ -590,6 +590,8 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
                 return MeshPrimitive::createSphere( 1 );
             }
         }
+    } else {
+        throw InvalidArgumentException("AtomsVariationsReader: No geo found");
     }
 
     return MeshPrimitive::createBox( Imath::Box3f( { -1, -1, -1 }, { 1, 1, 1 } ) );
@@ -600,7 +602,6 @@ void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::
 	SceneNode::hashChildNames( path, context, parent, h );
 	atomsAgentFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
-
 	h.append( &path.front(), path.size() );
 }
 

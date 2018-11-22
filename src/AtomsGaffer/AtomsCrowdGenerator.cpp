@@ -148,7 +148,6 @@ void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::C
 
 void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const
 {
-    //AtomsUtils::Logger::info() << "compute";
 	// The instanceChildNamesPlug is evaluated in a context in which
 	// scene:path holds the parent path for a branch.
 	if( output == agentChildNamesPlug() )
@@ -188,7 +187,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
         const auto agentId = crowd->variables.find( "agentId");
         if( agentId == crowd->variables.end() )
         {
-            throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"variation\" vertex variable" );
+            throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"agentId\" vertex variable" );
         }
 
         auto agentIdData = runTimeCast<const IntVectorData>(agentId->second.data);
@@ -298,7 +297,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         auto boxData = agentData->member<const Box3dData>("boundingBox");
         auto rootMatrixData = agentData->member<const M44dData>("rootMatrix");
         Imath::Box3f result;
-        if (boxData)
+        if (boxData && rootMatrixData)
         {
             auto agentBox = boxData->readable();
             auto rootMtx = rootMatrixData->readable();
@@ -313,7 +312,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         }
         else
         {
-            throw InvalidArgumentException( "AtomsCrowdGenerator : No pose found." );
+            throw InvalidArgumentException( "AtomsCrowdGenerator : No boundingBox or rootMatrix data found." );
         }
         return result;
     }
@@ -406,7 +405,7 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
         }
         else
         {
-            throw InvalidArgumentException( "AtomsCrowdGenerator : No pose found." );
+            throw InvalidArgumentException( "AtomsCrowdGenerator : No rootMatrix data found." );
         }
 
 		// \todo: Implement using Atoms API. See GafferScene::Instancer::EngineData for hints.

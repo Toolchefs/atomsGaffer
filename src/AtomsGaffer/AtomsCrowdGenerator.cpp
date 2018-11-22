@@ -951,63 +951,86 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 
 void AtomsCrowdGenerator::hashBranchSetNames( const ScenePath &parentPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
-	//h = agentsPlug()->setNamesPlug()->hash();
-    BranchCreator::hashBranchSetNames( parentPath, context, h );
+	h = agentsPlug()->setNamesPlug()->hash();
+    //BranchCreator::hashBranchSetNames( parentPath, context, h );
 }
 ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchSetNames( const ScenePath &parentPath, const Gaffer::Context *context ) const
 {
-	//return agentsPlug()->setNamesPlug()->getValue();
-	return BranchCreator::computeBranchSetNames( parentPath, context );
+	return agentsPlug()->setNamesPlug()->getValue();
+	//return BranchCreator::computeBranchSetNames( parentPath, context );
 }
 
 void AtomsCrowdGenerator::hashBranchSet( const ScenePath &parentPath, const InternedString &setName, const Gaffer::Context *context, MurmurHash &h ) const
 {
 	BranchCreator::hashBranchSet( parentPath, setName, context, h );
-/*
+
 	h.append( agentsPlug()->childNamesHash( ScenePath() ) );
 	agentChildNamesHash( parentPath, context, h );
 	agentsPlug()->setPlug()->hash( h );
 	namePlug()->hash( h );
- */
 }
+
+std::string printPath(const std::vector<InternedString>& path)
+{
+	std::string ss;
+	for(auto& p: path)
+	{
+		ss += std::string("/") + p.string();
+	}
+	return ss;
+}
+
 ConstPathMatcherDataPtr AtomsCrowdGenerator::computeBranchSet( const ScenePath &parentPath, const InternedString &setName, const Gaffer::Context *context ) const
 {
-    //AtomsUtils::Logger::info() << "computeBranchSet";
-    /*
 	ConstInternedStringVectorDataPtr agentNames = agentsPlug()->childNames( ScenePath() );
-	if (agentNames->readable().size() == 0)
-	{
-		AtomsUtils::Logger::info() << "Reading default agent type data";
-	}
-
 	IECore::ConstCompoundDataPtr instanceChildNames = agentChildNames( parentPath, context );
 	ConstPathMatcherDataPtr inputSet = agentsPlug()->setPlug()->getValue();
-*/
+
 	PathMatcherDataPtr outputSetData = new PathMatcherData;
-	/*
 	PathMatcher &outputSet = outputSetData->writable();
 
 	std::vector<InternedString> branchPath( { namePlug()->getValue() } );
 	std::vector<InternedString> agentPath( 1 );
 
+
+
 	for( const auto &agentName : agentNames->readable() )
 	{
-		branchPath.resize( 2 );
-		branchPath.back() = agentName;
 		agentPath.back() = agentName;
 
+        std::vector<std::string> paths;
+        inputSet->readable().paths(paths);
+
 		PathMatcher instanceSet = inputSet->readable().subTree( agentPath );
+		auto variationNamesData = instanceChildNames->member<CompoundData>( agentName );
+		if (!variationNamesData)
+			continue;
 
-		const std::vector<InternedString> &childNames = instanceChildNames->member<InternedStringVectorData>( agentName )->readable();
+		auto variationNames = variationNamesData->readable();
 
-		branchPath.emplace_back( InternedString() );
-		for( const auto &instanceChildName : childNames )
+		for(auto it = variationNames.cbegin(); it != variationNames.cend(); ++it)
 		{
-			branchPath.back() = instanceChildName;
-			outputSet.addPaths( instanceSet, branchPath );
+			branchPath.resize( 2 );
+			branchPath.back() = agentName;
+            PathMatcher variationInstanceSet = instanceSet.subTree( it->first );
+
+
+			auto childNamesData = runTimeCast<InternedStringVectorData>(it->second);
+			if (!childNamesData)
+				continue;
+
+			const std::vector<InternedString> &childNames = childNamesData->readable();
+			branchPath.emplace_back(InternedString());
+			branchPath.back() = it->first;
+			branchPath.emplace_back(InternedString());
+            for( const auto &instanceChildName : childNames )
+            {
+                branchPath.back() = instanceChildName;
+                outputSet.addPaths( variationInstanceSet, branchPath );
+            }
+
 		}
 	}
-*/
 	return outputSetData;
 }
 

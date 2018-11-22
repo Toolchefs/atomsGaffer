@@ -635,7 +635,19 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames
             for (auto& variationName: variationNames)
             {
                 result.emplace_back(variationName);
+
+                const auto groupData = agentTypeData->getGroupPtr(variationName);
+                if (groupData) {
+                    for (const auto &lodName: groupData->getLodNames()) {
+                        auto lodPtr = groupData->getLodPtr(lodName);
+                        if (!lodPtr)
+                            continue;
+                        result.emplace_back(variationName +':' + lodName);
+                    }
+                }
             }
+
+
         }
     }
     else if (path.size() == 2)
@@ -643,19 +655,49 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames
         auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
         if (agentTypeData)
         {
-            const auto groupData = agentTypeData->getGroupPtr(path[1]);
+            std::string pathName = path[1].string();
+            std::string variationName = path[1].string();
+            std::string lodName = "";
+            auto sepIndex = variationName.rfind(':');
+            if (sepIndex != std::string::npos)
+            {
+                std::string variationNameTmp = pathName.substr(0, sepIndex);
+                std::string lodNameTmp = pathName.substr(sepIndex + 1, pathName.size() - sepIndex );
+                const auto groupData = agentTypeData->getGroupPtr(variationNameTmp);
+                if (groupData && groupData->getLodPtr(lodNameTmp))
+                {
+                    variationName = variationNameTmp;
+                    lodName = lodNameTmp;
+                }
+            }
+
+            const auto groupData = agentTypeData->getGroupPtr(variationName);
             if (groupData)
             {
-                for(size_t i = 0; i < groupData->numCombinations(); ++i)
+                auto lodPtr = groupData->getLodPtr(lodName);
+                if (lodPtr)
                 {
-                    auto combination = groupData->getCombinationAtIndex(i);
-                    // skip the groom for now
-                    auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
-                    if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos)
+                    for(size_t i = 0; i < lodPtr->numCombinations(); ++i)
                     {
-                        continue;
+                        auto combination = lodPtr->getCombinationAtIndex(i);
+                        // skip the groom for now
+                        auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
+                        if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos)
+                        {
+                            continue;
+                        }
+                        result.emplace_back(combination.first);
                     }
-                    result.emplace_back( combination.first);
+                } else {
+                    for (size_t i = 0; i < groupData->numCombinations(); ++i) {
+                        auto combination = groupData->getCombinationAtIndex(i);
+                        // skip the groom for now
+                        auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
+                        if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos) {
+                            continue;
+                        }
+                        result.emplace_back(combination.first);
+                    }
                 }
             }
         }
@@ -684,15 +726,31 @@ void AtomsVariationReader::hashSetNames( const Gaffer::Context *context, const S
 
 IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeSetNames( const Gaffer::Context *context, const ScenePlug *parent ) const
 {
-    enginePlug()->getValue();
-	// \todo: Implement using Atoms API. See GafferScene::SceneReader for hints.
 	InternedStringVectorDataPtr resultData = new InternedStringVectorData();
-	/*
-	auto &result = resultData->writable();
 
-	result.emplace_back( "Sphere" );
-	result.emplace_back( "Cube" );
-    */
+    ConstEngineDataPtr engineData = static_pointer_cast<const EngineData>( enginePlug()->getValue() );
+    if (!engineData) {
+        return resultData;
+    }
+    auto &result = resultData->writable();
+    auto &variations = engineData->variations();
+    for (auto& agentTypeName: variations.getAgentTypeNames())
+    {
+        auto variationPtr = variations.getAgentTypeVariationPtr(agentTypeName);
+        if (!variationPtr)
+            continue;
+        for (auto& variationName: variationPtr->getGroupNames()) {
+            result.emplace_back(agentTypeName + ":" + variationName);
+
+            auto groupPtr = variationPtr->getGroupPtr(variationName);
+            if (!groupPtr)
+                continue;
+
+            for (auto& lodName: groupPtr->getLodNames()) {
+                result.emplace_back(agentTypeName + ":" + variationName + ":" + lodName);
+            }
+        }
+    }
 	return resultData;
 }
 
@@ -710,18 +768,76 @@ IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::
     enginePlug()->getValue();
 	// \todo: Implement using Atoms API. See GafferScene::SceneReader for hints.
 	PathMatcherDataPtr resultData = new PathMatcherData;
-	/*
-	PathMatcher &result = resultData->writable();
 
-	if( setName == "Sphere" )
-	{
-		result.addPath( { "SphereBot", "middle", "leaf" } );
-	}
-	else
-	{
-		result.addPath( { "CubeBot", "middle", "leaf" } );
-	}
-    */
+    ConstEngineDataPtr engineData = static_pointer_cast<const EngineData>( enginePlug()->getValue() );
+    if (!engineData) {
+        return resultData;
+    }
+    auto &result = resultData->writable();
+    auto &variations = engineData->variations();
+
+    std::string pathName = setName;
+    auto sepIndex = pathName.find(':');
+    if (sepIndex == std::string::npos)
+    {
+        return resultData;
+    }
+
+
+    std::string agentTypeName = pathName.substr(0, sepIndex);
+    std::string variationName = pathName.substr(sepIndex + 1, pathName.size() - sepIndex );
+    std::string lodName = "";
+
+    auto agentTypeData = variations.getAgentTypeVariationPtr(agentTypeName);
+    if (!agentTypeData)
+        return resultData;
+
+    sepIndex = variationName.rfind(':');
+    if (sepIndex != std::string::npos)
+    {
+        std::string variationNameTmp = variationName.substr(0, sepIndex);
+        std::string lodNameTmp = variationName.substr(sepIndex + 1, variationName.size() - sepIndex );
+        const auto groupData = agentTypeData->getGroupPtr(variationNameTmp);
+        if (groupData && groupData->getLodPtr(lodNameTmp))
+        {
+            variationName = variationNameTmp;
+            lodName = lodNameTmp;
+        }
+    }
+
+    std::string currentPath;
+    const auto groupData = agentTypeData->getGroupPtr(variationName);
+    if (groupData)
+    {
+        auto lodPtr = groupData->getLodPtr(lodName);
+        if (lodPtr)
+        {
+            for(size_t i = 0; i < lodPtr->numCombinations(); ++i)
+            {
+                auto combination = lodPtr->getCombinationAtIndex(i);
+                // skip the groom for now
+                auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
+                if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos)
+                {
+                    continue;
+                }
+                currentPath = "/" + agentTypeName + "/" + variationName + ":" + lodName + "/" + combination.first;
+                result.addPath(currentPath);
+            }
+        } else {
+            for (size_t i = 0; i < groupData->numCombinations(); ++i) {
+                auto combination = groupData->getCombinationAtIndex(i);
+                // skip the groom for now
+                auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
+                if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos) {
+                    continue;
+                }
+                currentPath = "/" + agentTypeName + "/" + variationName + "/" + combination.first;
+                result.addPath(currentPath);
+
+            }
+        }
+    }
 	return resultData;
 }
 

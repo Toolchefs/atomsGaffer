@@ -165,24 +165,6 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive Object." );
 		}
 
-		const auto agentType = crowd->variables.find( "agentType" );
-		if( agentType == crowd->variables.end() )
-		{
-			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"agentType\" vertex variable" );
-		}
-
-		auto agentTypesData = runTimeCast<const StringVectorData>(agentType->second.data);
-		auto& agentTypeVec = agentTypesData->readable();
-
-		const auto agentVariation = crowd->variables.find( "variation");
-		if( agentVariation == crowd->variables.end() )
-		{
-			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"variation\" vertex variable" );
-		}
-
-		auto agentVariationData = runTimeCast<const StringVectorData>(agentVariation->second.data);
-		auto& agentVariationVec = agentVariationData->readable();
-
 
         const auto agentId = crowd->variables.find( "agentId");
         if( agentId == crowd->variables.end() )
@@ -191,13 +173,94 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
         }
 
         auto agentIdData = runTimeCast<const IntVectorData>(agentId->second.data);
-        auto& agentIdVec = agentIdData->readable();
+        if (!agentIdData)
+        {
+            throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"agentId\" vertex variable" );
+        }
+        const std::vector<int>& agentIdVec = agentIdData->readable();
+
+
+        const std::vector<std::string>* agentTypeVec = nullptr;
+        const std::vector<std::string>* agentVariationVec = nullptr;
+        const std::vector<std::string>* agentLodVec = nullptr;
+        std::string agentTypeDefault = "";
+        std::string variationDefault = "";
+        std::string lodDefault = "";
+
+		const auto agentType = crowd->variables.find( "agentType" );
+		if( agentType == crowd->variables.end() )
+		{
+			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"agentType\" vertex variable" );
+		}
+
+        if ( agentType->second.interpolation == PrimitiveVariable::Vertex ) {
+            auto agentTypesData = runTimeCast<const StringVectorData>(agentType->second.data);
+            if (agentTypesData)
+                agentTypeVec = &agentTypesData->readable();
+        }else if (agentType->second.interpolation == PrimitiveVariable::Constant) {
+            auto agentTypesData = runTimeCast<const StringData>(agentType->second.data);
+            if (agentTypesData)
+                agentTypeDefault = agentTypesData->readable();
+        }
+
+		const auto agentVariation = crowd->variables.find( "variation");
+		if( agentVariation == crowd->variables.end() )
+		{
+			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"variation\" vertex variable" );
+		}
+
+        if ( agentVariation->second.interpolation == PrimitiveVariable::Vertex ) {
+            auto agentVariationData = runTimeCast<const StringVectorData>(agentVariation->second.data);
+            if (agentVariationData)
+                agentVariationVec = &agentVariationData->readable();
+        }else if (agentVariation->second.interpolation == PrimitiveVariable::Constant) {
+            auto agentVariationData = runTimeCast<const StringData>(agentVariation->second.data);
+            if (agentVariationData)
+                variationDefault = agentVariationData->readable();
+        }
+
+
+		const auto agentLod = crowd->variables.find( "lod");
+		if( agentLod == crowd->variables.end() )
+		{
+			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive containing an \"lod\" vertex variable" );
+		}
+
+		if ( agentLod->second.interpolation == PrimitiveVariable::Vertex ) {
+            auto agentLodData = runTimeCast<const StringVectorData>(agentLod->second.data);
+            if (agentLodData)
+                agentLodVec = &agentLodData->readable();
+        }else if (agentLod->second.interpolation == PrimitiveVariable::Constant) {
+            auto agentLodData = runTimeCast<const StringData>(agentLod->second.data);
+            if (agentLodData)
+                lodDefault = agentLodData->readable();
+        }
+
 
 		std::map<std::string, std::map<std::string, std::vector<int>>> agentVariationMap;
 
-        for( size_t agId = 0; agId < agentTypeVec.size(); ++agId )
+        for( size_t agId = 0; agId < agentIdVec.size(); ++agId )
         {
-            agentVariationMap[agentTypeVec[agId]][agentVariationVec[agId]].push_back(agentIdVec[agId]);
+            std::string agentTypeName = agentTypeDefault;
+            if (agentTypeVec)
+                agentTypeName = (*agentTypeVec)[agId];
+
+            std::string variationName = variationDefault;
+            if (agentVariationVec)
+                variationName = (*agentVariationVec)[agId];
+
+            if (variationName == "")
+                continue;
+
+            std::string lodName = lodDefault;
+            if (agentLodVec)
+                lodName = (*agentLodVec)[agId];
+
+        	if ( lodName != "" ) {
+				variationName = variationName + ':' + lodName;
+			}
+
+			agentVariationMap[agentTypeName][variationName].push_back(agentIdVec[agId]);
         }
 
         CompoundDataPtr result = new CompoundData;
@@ -869,7 +932,6 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
         IECore::ConstCompoundDataPtr children = agentChildNames( parentPath, context );
         auto variationsData = children->member<CompoundData>(branchPath[1]);
         InternedStringVectorDataPtr result = new InternedStringVectorData();
-        auto& names = result->writable();
         if (variationsData)
         {
             return variationsData->member<InternedStringVectorData>(branchPath.back());

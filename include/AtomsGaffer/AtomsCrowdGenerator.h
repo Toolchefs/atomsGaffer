@@ -30,8 +30,8 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		Gaffer::StringPlug *attributesPlug();
 		const Gaffer::StringPlug *attributesPlug() const;
 
-		Gaffer::IntPlug *modePlug();
-		const Gaffer::IntPlug *modePlug() const;
+		Gaffer::BoolPlug *useInstancesPlug();
+		const Gaffer::BoolPlug *useInstancesPlug() const;
 
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 
@@ -69,7 +69,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		IECore::ConstCompoundDataPtr agentChildNames( const ScenePath &parentPath, const Gaffer::Context *context ) const;
 		void agentChildNamesHash( const ScenePath &parentPath, const Gaffer::Context *context, IECore::MurmurHash &h ) const;
 
-		struct AgentScope : public Gaffer::Context::EditableScope
+		void poseAttributesHash( const ScenePath &branchPath, IECore::MurmurHash &h) const;
+
+	struct AgentScope : public Gaffer::Context::EditableScope
 		{
 			AgentScope( const Gaffer::Context *context, const ScenePath &branchPath );
 		};

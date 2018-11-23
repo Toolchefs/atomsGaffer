@@ -1,5 +1,6 @@
-#include <AtomsUtils/Logger.h>
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
+#include "Atoms/GlobalNames.h"
+#include "AtomsUtils/Logger.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 #include "IECoreScene/MeshPrimitive.h"
@@ -24,7 +25,7 @@ AtomsCrowdGenerator::AtomsCrowdGenerator( const std::string &name )
 	addChild( new StringPlug( "name", Plug::In, "agents" ) );
 	addChild( new ScenePlug( "agents" ) );
 	addChild( new StringPlug( "attributes", Plug::In ) );
-	addChild( new IntPlug( "mode" ) );
+	addChild( new BoolPlug( "useInstances" ) );
 
 	addChild( new AtomicCompoundDataPlug( "__agentChildNames", Plug::Out, new CompoundData ) );
 }
@@ -70,14 +71,14 @@ const Gaffer::AtomicCompoundDataPlug *AtomsCrowdGenerator::agentChildNamesPlug()
 	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 4 );
 }
 
-Gaffer::IntPlug *AtomsCrowdGenerator::modePlug()
+Gaffer::BoolPlug *AtomsCrowdGenerator::useInstancesPlug()
 {
-    return getChild<IntPlug>( g_firstPlugIndex + 3 );
+    return getChild<BoolPlug>( g_firstPlugIndex + 3 );
 }
 
-const Gaffer::IntPlug *AtomsCrowdGenerator::modePlug() const
+const Gaffer::BoolPlug *AtomsCrowdGenerator::useInstancesPlug() const
 {
-    return getChild<IntPlug>( g_firstPlugIndex + 3 );
+    return getChild<BoolPlug>( g_firstPlugIndex + 3 );
 }
 
 void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
@@ -142,7 +143,7 @@ void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::C
 	{
 		inPlug()->objectPlug()->hash( h );
 		h.append( agentsPlug()->childNamesHash( ScenePath() ) );
-		modePlug()->hash( h );
+		useInstancesPlug()->hash( h );
 	}
 }
 
@@ -558,9 +559,10 @@ void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const S
         agentsPlug()->objectPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
         // todo: use the hash from the pose
-        h.append(branchPath[3]);
+		poseAttributesHash(branchPath, h);
         //h.append( context->getFrame() );
 
+        //AtomsUtils::Logger::info() << branchPath[3] << " " << h.toString();
 	}
 
 }
@@ -614,7 +616,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                 {
 					auto &points = meshPointData->writable();
 					auto &normals = meshNormalData->writable();
-                	auto& metadataMap = metadataData->readable();
+                	auto &metadataMap = metadataData->readable();
                     auto blendShapeCountData = runTimeCast<IntData>(blendShapeCountDataIt->second.data);
                     int numBlendShapes = blendShapeCountData->readable();
 
@@ -1059,4 +1061,90 @@ AtomsCrowdGenerator::AgentScope::AgentScope( const Gaffer::Context *context, con
 		agentPath.insert( agentPath.end(), branchPath.begin() + 4, branchPath.end() );
 	}
 	set( ScenePlug::scenePathContextName, agentPath );
+}
+
+inline bool isDefaultAtomsMetadataName(const char* attrName)
+{
+	const char *ALL_ATOMS_ATTRS[] = {
+	ATOMS_AGENT_STATE,
+	ATOMS_AGENT_UP,
+	ATOMS_AGENT_POSITION,
+	ATOMS_AGENT_DIRECTION,
+	ATOMS_AGENT_SCALE,
+	ATOMS_AGENT_GROUPID,
+	ATOMS_AGENT_ID,
+	ATOMS_AGENT_LOCAL_DIRECTION,
+	ATOMS_AGENT_GROUPNAME,
+	ATOMS_AGENT_SELECTED,
+	ATOMS_AGENT_TYPE,
+	ATOMS_AGENT_FRAMERATE,
+	ATOMS_AGENT_TURN_ANGLE,
+	ATOMS_AGENT_VELOCITY,
+	ATOMS_AGENT_ANIMATED_HF,
+	ATOMS_AGENT_GRAVITY,
+	ATOMS_AGENT_CACHE_ID,
+	ATOMS_AGENT_BIRTH,
+	ATOMS_AGENT_RETARGETING_FACTOR,
+	ATOMS_AGENT_COLLECTOR_DIRECTIONS,
+	ATOMS_AGENT_CLOTH_SETUP_OVERRIDE,
+	ATOMS_AGENT_COLOR,
+	ATOMS_AGENT_DISABLE_IK,
+	ATOMS_AGENT_USE_CLIP_DIRECTION,
+	"_prevState"
+	};
+	size_t size = sizeof(ALL_ATOMS_ATTRS) / sizeof(ALL_ATOMS_ATTRS[0]);
+	for (unsigned int i = 0; i < size; ++i)
+		if (!strcmp(ALL_ATOMS_ATTRS[i], attrName))
+			return true;
+	return false;
+}
+
+void AtomsCrowdGenerator::poseAttributesHash( const ScenePath &branchPath, IECore::MurmurHash &h) const
+{
+    if (!useInstancesPlug()->getValue())
+    {
+        h.append(branchPath[3]);
+        return;
+    }
+    auto meshAttributes = runTimeCast<const CompoundObject>(agentsPlug()->attributesPlug()->getValue());
+    if (meshAttributes)
+    {
+        auto crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
+        if( !crowd )
+        {
+            throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
+        }
+
+
+        auto agentData = crowd->member<const CompoundData>(branchPath[3]);
+        if(! agentData )
+        {
+            throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found while hashing " + branchPath[3].string());
+        }
+
+        auto hashPoseData = agentData->member<const UInt64Data>("hash");
+        if (hashPoseData)
+        {
+            h.append(hashPoseData->readable());
+        } else {
+            h.append(branchPath[3]);
+        }
+
+
+        auto metadataData = agentData->member<const CompoundData>("metadata");
+        if (metadataData)
+        {
+            auto &metadataMap = metadataData->readable();
+            for (auto metaIt = metadataMap.cbegin(); metaIt != metadataMap.cend(); ++metaIt)
+            {
+                if (isDefaultAtomsMetadataName(metaIt->first.c_str()))
+                    continue;
+                metaIt->second->hash(h);
+            }
+        }
+
+    } else
+    {
+        h.append(branchPath[3]);
+    }
 }

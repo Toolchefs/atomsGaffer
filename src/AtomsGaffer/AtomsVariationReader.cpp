@@ -14,6 +14,7 @@
 #include "Atoms/Loaders/MeshLoader.h"
 #include "Atoms/GlobalNames.h"
 #include "AtomsUtils/PathSolver.h"
+#include "AtomsUtils/Utils.h"
 #include "AtomsCore/Metadata/MeshMetadata.h"
 #include "AtomsCore/Metadata/Box3Metadata.h"
 #include "AtomsCore/Metadata/BoolMetadata.h"
@@ -201,11 +202,13 @@ public :
         m_variations = Atoms::loadVariationFromFile(AtomsUtils::solvePath((filePath)));
 
         auto agentTypeNames = m_variations.getAgentTypeNames();
+        m_hierarchy = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
         for (size_t aTypeId = 0; aTypeId != agentTypeNames.size(); ++aTypeId)
         {
             auto agentTypePtr = m_variations.getAgentTypeVariationPtr(agentTypeNames[aTypeId]);
             if (!agentTypePtr)
                 continue;
+
 
 
             auto geoNames = agentTypePtr->getGeometryNames();
@@ -264,6 +267,55 @@ public :
                 atomsGeoMap->addEntry("boundingBox", &boxMeta);
                 m_meshesFileCache[agentTypeNames[aTypeId]][geoPtr->getGeometryFile() + ":" +geoPtr->getGeometryFilter()] = atomsGeoMap;
             }
+
+            auto agentTypeIt = m_meshesFileCache.find(agentTypeNames[aTypeId]);
+            if (agentTypeIt == m_meshesFileCache.end())
+                continue;
+
+            AtomsPtr<AtomsCore::MapMetadata> agentTypeHierarchy(new AtomsCore::MapMetadata);
+            for (const auto& variationName: agentTypePtr->getGroupNames())
+            {
+                auto variationPtr = agentTypePtr->getGroupPtr(variationName);
+                if (!variationPtr)
+                    continue;
+
+                AtomsPtr<AtomsCore::MapMetadata> variationHierarchy(new AtomsCore::MapMetadata);
+
+                for(size_t cId = 0; cId < variationPtr->numCombinations(); ++cId)
+                {
+                    auto combination = variationPtr->getCombinationAtIndex(cId);
+
+                    auto geoPtr = agentTypePtr->getGeometryPtr(combination.first);
+                    if (!geoPtr)
+                        continue;
+
+                    if (agentTypeIt->second.find(geoPtr->getGeometryFile() + ":" +geoPtr->getGeometryFilter()) == agentTypeIt->second.end())
+                        continue;
+
+                    std::vector<std::string> objectNames;
+                    AtomsUtils::splitString(combination.first, '|', objectNames);
+
+                    auto currentMap = variationHierarchy;
+                    for(const auto& objName: objectNames)
+                    {
+                        auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
+                        if (!objIt)
+                        {
+                            AtomsCore::MapMetadata emptyData;
+                            currentMap->addEntry(objName, &emptyData);
+                            objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
+                        }
+                        currentMap = objIt;
+                    }
+                }
+
+                auto variationHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>(variationHierarchy);
+                agentTypeHierarchy->addEntry(variationName, variationHierarchyData, false);
+            }
+
+            auto agentTypeHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>(agentTypeHierarchy);
+            m_hierarchy->addEntry(agentTypeNames[aTypeId],agentTypeHierarchyData, false);
+
         }
 
     }
@@ -278,6 +330,11 @@ public :
     const Atoms::Variations& variations() const
     {
         return m_variations;
+    }
+
+    const AtomsPtr<AtomsCore::MapMetadata>& hierarchy() const
+    {
+        return m_hierarchy;
     }
 
     const std::map<std::string, std::map<std::string, AtomsPtr<AtomsCore::MapMetadata>>>& meshCache() const
@@ -312,6 +369,8 @@ private :
     std::string m_filePath;
 
     std::map<std::string, std::map<std::string, AtomsPtr<AtomsCore::MapMetadata>>> m_meshesFileCache;
+
+    AtomsPtr<AtomsCore::MapMetadata> m_hierarchy;
 
 };
 
@@ -408,7 +467,14 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
     auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
     auto cacheMeshIt =  meshCache.find(path[0]);
     if (agentTypeData && cacheMeshIt != meshCache.cend()) {
-        auto geoData = agentTypeData->getGeometryPtr(path[2]);
+
+        std::string geoPathName = path[2];
+        for (size_t i=3; i < path.size(); ++i)
+        {
+            geoPathName += "|" + path[i].string();
+        }
+
+        auto geoData = agentTypeData->getGeometryPtr(geoPathName);
         if (geoData &&  (geoData->getGeometryFile().find(".groom") == std::string::npos)) {
             auto geoCacheMeshIt = cacheMeshIt->second.find(
                     geoData->getGeometryFile() + ":" + geoData->getGeometryFilter());
@@ -430,7 +496,7 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
         }
     }
 
-    return { { -1, -1, -1 }, { 1, 1, 1 } };
+    return unionOfTransformedChildBounds( path, parent );
 }
 
 void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
@@ -469,7 +535,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
         return parent->attributesPlug()->defaultValue();
     }
 
-    CompoundObjectPtr result = new CompoundObject;
+
     auto &translator = AtomsMetadataTranslator::instance();
     auto &variations = engineData->variations();
     auto &meshCache = engineData->meshCache();
@@ -477,7 +543,14 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
     auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
     auto cacheMeshIt = meshCache.find(path[0]);
     if (agentTypeData && cacheMeshIt != meshCache.cend()) {
-        auto geoData = agentTypeData->getGeometryPtr(path[2]);
+
+        std::string geoPathName = path[2];
+        for (size_t i=3; i < path.size(); ++i)
+        {
+            geoPathName += "|" + path[i].string();
+        }
+
+        auto geoData = agentTypeData->getGeometryPtr(geoPathName);
         if (geoData && (geoData->getGeometryFile().find(".groom") == std::string::npos)) {
             auto geoCacheMeshIt = cacheMeshIt->second.find(
                     geoData->getGeometryFile() + ":" + geoData->getGeometryFilter());
@@ -485,7 +558,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
             if (geoCacheMeshIt != cacheMeshIt->second.cend() && geoCacheMeshIt->second) {
                 /// todo merge multiple mesh here
                 auto atomsGeo = geoCacheMeshIt->second;
-
+                CompoundObjectPtr result = new CompoundObject;
                 for (auto meshIt = atomsGeo->cbegin(); meshIt != atomsGeo->cend(); ++meshIt) {
                     if (meshIt->second->typeId() != AtomsCore::MapMetadata::staticTypeId())
                         continue;
@@ -541,11 +614,12 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                             result->members()[meshAttrIt->first] = data;
                     }
                 }
+                return result;
             }
         }
     }
+    return parent->attributesPlug()->defaultValue();
 
-	return result;
 }
 
 void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
@@ -566,15 +640,22 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
 
     ConstEngineDataPtr engineData = static_pointer_cast<const EngineData>( enginePlug()->getValue() );
     if (!engineData) {
-        return MeshPrimitive::createBox( Imath::Box3f( { -1, -1, -1 }, { 1, 1, 1 } ) );
+        return parent->objectPlug()->defaultValue();
     }
 
     auto &variations = engineData->variations();
     auto &meshCache = engineData->meshCache();
     auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
     auto cacheMeshIt =  meshCache.find(path[0]);
-    if (agentTypeData && cacheMeshIt != meshCache.cend()) {
-        auto geoData = agentTypeData->getGeometryPtr(path[2]);
+    if (agentTypeData && cacheMeshIt != meshCache.cend())
+    {
+        std::string geoPathName = path[2];
+        for (size_t i=3; i < path.size(); ++i)
+        {
+            geoPathName += "|" + path[i].string();
+        }
+
+        auto geoData = agentTypeData->getGeometryPtr(geoPathName);
         if (geoData && (geoData->getGeometryFile().find(".groom") == std::string::npos)) {
             auto geoCacheMeshIt = cacheMeshIt->second.find(
                     geoData->getGeometryFile() + ":" + geoData->getGeometryFilter());
@@ -587,14 +668,14 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
                     auto geoMap = std::static_pointer_cast<AtomsCore::MapMetadata>(meshIt->second);
                     return convertAtomsMesh(geoMap);
                 }
-                return MeshPrimitive::createSphere( 1 );
+                return MeshPrimitive::createBox( Imath::Box3f( { -1, -1, -1 }, { 1, 1, 1 } ) );
             }
         }
     } else {
         throw InvalidArgumentException("AtomsVariationsReader: No geo found");
     }
 
-    return MeshPrimitive::createBox( Imath::Box3f( { -1, -1, -1 }, { 1, 1, 1 } ) );
+    return parent->objectPlug()->defaultValue();
 }
 
 void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
@@ -616,93 +697,31 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames
     if (!engineData) {
         return resultData;
     }
-    auto &variations = engineData->variations();
-	if (path.empty())
-    {
 
-        auto agentTypeNames = variations.getAgentTypeNames();
-        for (auto& agentTypeName: agentTypeNames)
+    auto& hierarchy = engineData->hierarchy();
+    if (path.empty())
+    {
+        for (auto& agentTypeName: hierarchy->getKeys())
         {
             result.emplace_back(agentTypeName);
         }
-    }
-    else if (path.size() == 1)
-    {
-        auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
-        if (agentTypeData)
+    } else{
+        AtomsPtr<const AtomsCore::MapMetadata> currentPath = hierarchy;
+        for(const auto& name: path)
         {
-            auto variationNames = agentTypeData->getGroupNames();
-            for (auto& variationName: variationNames)
-            {
-                result.emplace_back(variationName);
-
-                const auto groupData = agentTypeData->getGroupPtr(variationName);
-                if (groupData) {
-                    for (const auto &lodName: groupData->getLodNames()) {
-                        auto lodPtr = groupData->getLodPtr(lodName);
-                        if (!lodPtr)
-                            continue;
-                        result.emplace_back(variationName +':' + lodName);
-                    }
-                }
-            }
-
-
+            currentPath = currentPath->getTypedEntry<const AtomsCore::MapMetadata>(name);
+            if (currentPath)
+                continue;
         }
-    }
-    else if (path.size() == 2)
-    {
-        auto agentTypeData = variations.getAgentTypeVariationPtr(path[0]);
-        if (agentTypeData)
-        {
-            std::string pathName = path[1].string();
-            std::string variationName = path[1].string();
-            std::string lodName = "";
-            auto sepIndex = variationName.rfind(':');
-            if (sepIndex != std::string::npos)
-            {
-                std::string variationNameTmp = pathName.substr(0, sepIndex);
-                std::string lodNameTmp = pathName.substr(sepIndex + 1, pathName.size() - sepIndex );
-                const auto groupData = agentTypeData->getGroupPtr(variationNameTmp);
-                if (groupData && groupData->getLodPtr(lodNameTmp))
-                {
-                    variationName = variationNameTmp;
-                    lodName = lodNameTmp;
-                }
-            }
 
-            const auto groupData = agentTypeData->getGroupPtr(variationName);
-            if (groupData)
+        if (currentPath)
+        {
+            for (auto& objName: currentPath->getKeys())
             {
-                auto lodPtr = groupData->getLodPtr(lodName);
-                if (lodPtr)
-                {
-                    for(size_t i = 0; i < lodPtr->numCombinations(); ++i)
-                    {
-                        auto combination = lodPtr->getCombinationAtIndex(i);
-                        // skip the groom for now
-                        auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
-                        if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos)
-                        {
-                            continue;
-                        }
-                        result.emplace_back(combination.first);
-                    }
-                } else {
-                    for (size_t i = 0; i < groupData->numCombinations(); ++i) {
-                        auto combination = groupData->getCombinationAtIndex(i);
-                        // skip the groom for now
-                        auto geoPtr = agentTypeData->getGeometryPtr(combination.first);
-                        if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos) {
-                            continue;
-                        }
-                        result.emplace_back(combination.first);
-                    }
-                }
+                result.emplace_back(objName);
             }
         }
     }
-
 	return resultData;
 }
 
@@ -821,7 +840,12 @@ IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::
                 {
                     continue;
                 }
-                currentPath = "/" + agentTypeName + "/" + variationName + ":" + lodName + "/" + combination.first;
+                currentPath = "/" + agentTypeName + "/" + variationName + ":" + lodName;// + "/" + combination.first;
+                std::vector<std::string> objectNames;
+                AtomsUtils::splitString(combination.first, '|', objectNames);
+                for (const auto& objName: objectNames) {
+                    currentPath += "/" + objName;
+                }
                 result.addPath(currentPath);
             }
         } else {
@@ -832,7 +856,12 @@ IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::
                 if (geoPtr && geoPtr->getGeometryFile().find(".groom") != std::string::npos) {
                     continue;
                 }
-                currentPath = "/" + agentTypeName + "/" + variationName + "/" + combination.first;
+                currentPath = "/" + agentTypeName + "/" + variationName;// + "/" + combination.first;
+                std::vector<std::string> objectNames;
+                AtomsUtils::splitString(combination.first, '|', objectNames);
+                for (const auto& objName: objectNames) {
+                    currentPath += "/" + objName;
+                }
                 result.addPath(currentPath);
 
             }

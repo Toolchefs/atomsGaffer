@@ -4,11 +4,6 @@ project(AtomsGaffer)
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
-set(ATOMS_ROOT /home/alan/projects/atomscrowd/deployGaffer)
-set(GAFFER_ROOT /home/alan/projects/gafferDependency/deploy)
-set(CMAKE_INSTALL_PREFIX /home/alan/projects/atomsGaffer/deploy)
-include_directories(/home/alan/projects/atomscrowd/deployGaffer/include)
-
 # build the library
 file( GLOB AtomsGafferSrc src/AtomsGaffer/*.cpp )
 link_directories( AtomsGaffer ${GAFFER_ROOT}/lib ${ATOMS_ROOT}/lib )

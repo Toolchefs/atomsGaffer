@@ -709,6 +709,10 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames
         AtomsPtr<const AtomsCore::MapMetadata> currentPath = hierarchy;
         for(const auto& name: path)
         {
+            if (!currentPath)
+            {
+                return resultData;
+            }
             currentPath = currentPath->getTypedEntry<const AtomsCore::MapMetadata>(name);
             if (currentPath)
                 continue;

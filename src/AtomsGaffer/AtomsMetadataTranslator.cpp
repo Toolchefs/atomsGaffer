@@ -216,6 +216,6 @@ IECore::DataPtr AtomsMetadataTranslator::translate(const AtomsPtr<AtomsCore::Met
     auto it = translatorMap.find(metadata->typeId());
     if (it != translatorMap.end())
         return (it->second)(metadata);
-    AtomsUtils::Logger::info() << "Metadata converter doesn't exist for metadata type: " << metadata->typeStr();
+    AtomsUtils::Logger::warning() << "Metadata converter doesn't exist for metadata type: " << metadata->typeStr();
     return IECore::DataPtr();
 }

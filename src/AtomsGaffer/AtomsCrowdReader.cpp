@@ -54,6 +54,7 @@ public :
 
         if( !m_cache.openCache( cachePath, cacheName ) )
         {
+            IECore::msg( IECore::Msg::Warning, "AtomsCrowdReader", "Unable to load the atoms cache " + cachePath + "/" + cacheName + ".atoms");
             return;
         }
 
@@ -369,7 +370,6 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     double frame = engineData->frame();
     auto& atomsCache = engineData->cache();
     //extract the ids, variation, lod, position, direction and velocity and bbox and store them on points
-
     auto& agentIds = engineData->agentIds();
     size_t numAgents = agentIds.size();
 
@@ -455,17 +455,6 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
         }
 
 
-        AtomsCore::Box3 bbox;
-        atomsCache.loadAgentBoundingBox( frame, agentId, bbox );
-        auto& bbOut = boundingBox[i];
-        bbOut.min.x = bbox.min.x;
-        bbOut.min.y = bbox.min.y;
-        bbOut.min.z = bbox.min.z;
-
-        bbOut.max.x = bbox.max.x;
-        bbOut.max.y = bbox.max.y;
-        bbOut.max.z = bbox.max.z;
-
         if ( pose.numJoints() > 0 ) {
             auto agentTypePtr = atomsAgentTypes.agentType( agentTypeName );
             if (agentTypePtr)
@@ -483,15 +472,12 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     }
 
     PointsPrimitivePtr points = new PointsPrimitive( positionData );
-    points->variables["agentType"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentTypesData);
-    points->variables["variation"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentVariationData);
-    points->variables["lod"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentLodData);
-    points->variables["agentId"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsData);
-    points->variables["velocity"] = PrimitiveVariable( PrimitiveVariable::Vertex, velocityData);
-    points->variables["direction"] = PrimitiveVariable( PrimitiveVariable::Vertex, directionData);
-    // For now don't save this since the ui inspector rises an exception
-    //points->variables["boundingBox"] = PrimitiveVariable( PrimitiveVariable::Vertex, boundingBoxData);
-    //points->variables["rootMatrix"] = PrimitiveVariable( PrimitiveVariable::Vertex, rootMatrixData);
+    points->variables["atoms:agentType"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentTypesData);
+    points->variables["atoms:variation"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentVariationData);
+    points->variables["atoms:lod"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentLodData);
+    points->variables["atoms:agentId"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsData);
+    points->variables["atoms:velocity"] = PrimitiveVariable( PrimitiveVariable::Vertex, velocityData);
+    points->variables["atoms:direction"] = PrimitiveVariable( PrimitiveVariable::Vertex, directionData);
     return points;
 
 }
@@ -548,7 +534,8 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         AtomsPtr<AtomsCore::MapMetadata> metadataPtr( new AtomsCore::MapMetadata );
         atomsCache.loadAgentMetadata( frame, agentId, *metadataPtr.get() );
 
-
+        Box3dDataPtr agentBBox = new Box3dData;
+        auto& agentBBoxData = agentBBox->writable();
         if (agentTypePtr)
         {
             AtomsCore::Poser poser(&agentTypePtr->skeleton());
@@ -579,10 +566,17 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
             const AtomsCore::MapMetadata& metadata = agentTypePtr->metadata();
             AtomsPtr<const AtomsCore::MatrixArrayMetadata> bindPosesInvPtr = metadata.getTypedEntry<const AtomsCore::MatrixArrayMetadata>("worldBindPoseInverseMatrices");
+            if (!bindPosesInvPtr)
+            {
+                throw InvalidArgumentException( "AtomsCrowdReader : No worldBindPoseInverseMatrices metadata found on agent type: " +  agentTypeName);
+            }
+
             const std::vector<AtomsCore::Matrix>& bindPosesInv = bindPosesInvPtr->get();
+
 
             for (unsigned int j = 0; j < outMatrices.size(); j++) {
                 AtomsCore::Matrix &jMtx = outMatrices[j];
+                agentBBoxData.extendBy(jMtx.translation());
                 jMtx = bindPosesInv[j] * jMtx;
                 outNormalMatrices[j] = jMtx.inverse().transpose();
             }
@@ -600,13 +594,9 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         {
             throw InvalidArgumentException("AtomsCrowdReader: Invalid agent type " + agentTypeName);
         }
-        //agentCompound["pose"] = translator.translate( posePtr );
 
         agentCompound["metadata"] = translator.translate(metadataPtr);
 
-
-        Box3dDataPtr agentBBox = new Box3dData;
-        atomsCache.loadAgentBoundingBox( frame, agentId, agentBBox->writable() );
         agentCompound["boundingBox"] = agentBBox;
 
         StringDataPtr aTypeData = new StringData();
@@ -616,58 +606,6 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         members[ std::to_string( agentId ) ] = agentCompoundData;
     }
 
-    /*
-    // store also the agent types inside the compound
-    auto& agentTypes = atomsCache.agentTypes();
-    auto agentTypeNames = agentTypes.agentTypeNames();
-    CompoundDataPtr agentTypesCompoundData = new CompoundData;
-    auto &agentTypesCompound = agentTypesCompoundData->writable();
-    for ( size_t i = 0; i < agentTypeNames.size(); ++i )
-    {
-        const std::string& name = agentTypeNames[i];
-
-        auto agentType = agentTypes.agentType( name );
-        if (!agentType)
-            continue;
-
-        CompoundDataPtr agentTypeCompoundData = new CompoundData;
-        auto &agentTypeCompound = agentTypeCompoundData->writable();
-
-        //store the bind world matrices
-        auto& skeleton = agentType->skeleton();
-        AtomsCore::Poser poser(&skeleton);
-        M44dVectorDataPtr worldBindMatrices = new M44dVectorData;
-        worldBindMatrices->writable() = poser.getAllWorldBindMatrix();
-        agentTypeCompound["worldBindMatrices"] = worldBindMatrices;
-
-        M44dVectorDataPtr bindMatrices = new M44dVectorData;
-        auto& bindMtxVec = worldBindMatrices->writable();
-        bindMtxVec.resize(skeleton.numJoints());
-        for( size_t jId=0; jId < skeleton.numJoints(); ++jId )
-        {
-            bindMtxVec[jId] = skeleton.joint( jId ).matrix();
-        }
-        agentTypeCompound["bindMatrices"] = bindMatrices;
-
-
-        CompoundDataPtr agentTypeMetadataCompound = new CompoundData;
-        auto& agentTypeMetadata = agentType->metadata();
-        for( auto it = agentTypeMetadata.cbegin(); it != agentTypeMetadata.cend(); ++it )
-        {
-            if (!it->second)
-                continue;
-
-            IECore::DataPtr object = translator.translate( it->second );
-            if (object)
-                agentTypeMetadataCompound->writable()[it->first] = object;
-        }
-        //agentTypeCompound["metadata"] = agentTypeMetadataCompound;
-
-        agentTypesCompound[name] = agentTypeCompoundData;
-    }
-
-    members["agentTypes"] = agentTypesCompoundData;
-    */
     return result;
 }
 

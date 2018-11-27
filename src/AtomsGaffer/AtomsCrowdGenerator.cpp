@@ -868,6 +868,18 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                             continue;
                         }
 
+                        if ( metaIt->second->typeId() == V3fVectorData::staticTypeId() ||
+                             metaIt->second->typeId() == V3fVectorDataBase::staticTypeId() ||
+                                metaIt->second->typeId() == FloatVectorData::staticTypeId() ||
+                                metaIt->second->typeId() == BoolVectorData::staticTypeId() ||
+                                metaIt->second->typeId() == IntVectorData::staticTypeId() ||
+                                metaIt->second->typeId() == V2fVectorData::staticTypeId() ||
+                                metaIt->second->typeId() == M44fVectorData::staticTypeId()
+                                )
+                        {
+                            continue;
+                        }
+
                         result->variables[metaIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, metaIt->second);
                     }
                 }
@@ -906,9 +918,9 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 break;
                             }
 
-                            case IECore::TypeId::StringDataTypeId:
+                            case IECore::TypeId::StringVectorDataTypeId:
                             {
-                                auto data = runTimeCast<const StringData>(primIt->second);
+                                auto data = runTimeCast<const StringVectorData>(primIt->second);
                                 StringDataPtr outData = new StringData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
                                 result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData);
@@ -927,6 +939,16 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                             case IECore::TypeId::V3fVectorDataTypeId:
                             {
                                 auto data = runTimeCast<const V3fVectorData>(primIt->second);
+                                V3fDataPtr outData = new V3fData();
+                                outData->writable() = data->readable()[agentIdPointIndex];
+                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData);
+                                break;
+                            }
+
+
+                            case IECore::TypeId::V3fVectorDataBaseTypeId:
+                            {
+                                auto data = runTimeCast<const V3fVectorDataBase>(primIt->second);
                                 V3fDataPtr outData = new V3fData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
                                 result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData);
@@ -953,6 +975,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 
                             default:
                             {
+                            	AtomsUtils::Logger::warning() << "Unable to set " << primIt->first;
                                 break;
                             }
                         }

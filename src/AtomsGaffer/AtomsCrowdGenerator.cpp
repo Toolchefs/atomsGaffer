@@ -1,3 +1,4 @@
+#include <AtomsUtils/Logger.h>
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
 #include "Atoms/GlobalNames.h"
 
@@ -346,16 +347,21 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
 	}
 	else if ( branchPath.size() >= 4 )
     {
-        auto crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
+		ConstCompoundObjectPtr crowd;
+		{
+			ScenePlug::PathScope scope(context, parentPath);
+			crowd = runTimeCast<const CompoundObject>(inPlug()->attributesPlug()->getValue());
+		}
+
         if( !crowd )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
-        auto agentData = crowd->member<const CompoundData>( branchPath.back() );
+        auto agentData = crowd->member<const CompoundData>( branchPath[3] );
         if( !agentData )
         {
-            throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found." );
+            throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchBound : No agent found." );
         }
 
         auto boxData = agentData->member<const Box3dData>( "boundingBox" );
@@ -413,16 +419,21 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
 		// "/agents/<agentType>/<variaiton>/<id>"
 		Imath::M44f result;
 
-        auto crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
+		ConstCompoundObjectPtr crowd;
+		{
+			ScenePlug::PathScope scope(context, parentPath);
+			crowd = runTimeCast<const CompoundObject>(inPlug()->attributesPlug()->getValue());
+		}
+
         if( !crowd )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
-        auto agentData = crowd->member<const CompoundData>( branchPath.back() );
+        auto agentData = crowd->member<const CompoundData>( branchPath[3] );
         if( !agentData )
         {
-            throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found." );
+            throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchTransform : No agent found." );
         }
 
         auto poseData = agentData->member<const M44dData>( "rootMatrix" );
@@ -593,7 +604,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
             auto agentData = crowd->member<const CompoundData>( branchPath[3] );
             if( !agentData )
             {
-                throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found." );
+                throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchObject : No agent found." );
             }
 
             auto metadataData = agentData->member<const CompoundData>( "metadata" );

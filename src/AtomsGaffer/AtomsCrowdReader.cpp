@@ -405,6 +405,10 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     auto &direction = directionData->writable();
     direction.resize( numAgents );
 
+    V3fVectorDataPtr scaleData = new V3fVectorData;
+    auto &scale = scaleData->writable();
+    scale.resize( numAgents );
+
     Box3fVectorDataPtr boundingBoxData = new Box3fVectorData;
     auto &boundingBox = boundingBoxData->writable();
     boundingBox.resize( numAgents );
@@ -412,6 +416,10 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     M44fVectorDataPtr rootMatrixData = new M44fVectorData;
     auto &rootMatrix = rootMatrixData->writable();
     rootMatrix.resize( numAgents );
+
+    QuatfVectorDataPtr orientationData = new QuatfVectorData;
+    auto &orientation = orientationData->writable();
+    orientation.resize( numAgents );
 
 
     auto& atomsAgentTypes = atomsCache.agentTypes();
@@ -457,6 +465,16 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
             vOut.z = v.z;
         }
 
+        auto scaleMetadata = metadata.getTypedEntry<AtomsCore::Vector3Metadata>( ATOMS_AGENT_SCALE );
+        if ( scaleMetadata )
+        {
+            auto& v = scaleMetadata->get();
+            auto& vOut = scale[i];
+            vOut.x = v.x;
+            vOut.y = v.y;
+            vOut.z = v.z;
+        }
+
 
         if ( pose.numJoints() > 0 )
         {
@@ -469,6 +487,8 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
                 {
                     positions[i] = matrices[0].translation();
                     rootMatrix[i] = Imath::M44f( matrices[0] );
+
+                    orientation[i] = Imath::extractQuat(matrices[0]);
                 }
             }
             else
@@ -485,6 +505,8 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     points->variables["atoms:agentId"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsData );
     points->variables["atoms:velocity"] = PrimitiveVariable( PrimitiveVariable::Vertex, velocityData );
     points->variables["atoms:direction"] = PrimitiveVariable( PrimitiveVariable::Vertex, directionData );
+    points->variables["atoms:scale"] = PrimitiveVariable( PrimitiveVariable::Vertex, scaleData );
+    points->variables["atoms:orientation"] = PrimitiveVariable( PrimitiveVariable::Vertex, orientationData );
     return points;
 
 }

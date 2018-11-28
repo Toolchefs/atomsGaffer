@@ -42,22 +42,20 @@ Gaffer.Metadata.registerNode(
 
         ],
 
-        "agents" : [
+        "variations" : [
 
             "description",
             """
-			The scene containing the agents to be applied to each vertex of
-			the crowd. Specify multiple agents by parenting them at the root
-			of the scene :
+			The scene containing the agent variation mesh to be applied to each agent skeleton of
+			the crowd. Specify multiple variation by parenting them at the right agent type:
 
-			- /agent0
-			- /agent1
-			- /agent2
+			- /soldier/soldierSword
+			- /soldier/soldierSwordShield
+			- /archer/defaultArcher
+			
+			Set up the lod using ':' after the variation name. Eg. /soldier/soldierSword:A
 
-			Be sure to order the agents to match the \"agentType\" data provided
-			on the input crowd points.
-
-			Note that the agents are not limited to being a
+			Note that the variations are not limited to being a
 			single object : they can each have arbitrary child
 			hierarchies.
 			""",
@@ -66,31 +64,13 @@ Gaffer.Metadata.registerNode(
 
         ],
 
-        "attributes" : [
+        "useInstances" : [
 
             "description",
             """
-			The names of per-vertex primitive variables to be turned into
-			per-agent attributes. Names should be separated by spaces and
-			can use Gaffer's standard wildcards.
-			""",
+            Turn on agent instancing. Agents with the same pose and metadata values are instanced.
+            """,
 
-        ],
-
-        "mode" : [
-
-            "description",
-            """
-            Compute mode
-             0 - Hierarchy of the full crowd, including per-agent locations (with geometry)
-             1 - Hierarchy of the full crowd, including per-agent locations (no geometry)
-             2 - Hierarchy of the full crowd, terminating at the start of each agent (with capsules)
-                A Capsule is akin to an on-the-fly procedural, or Houdini packed-prim
-             3 - Hierarchy of the full crowd, terminating at the start of each agent (no geometry)
-             4 - Hierarchy of the full crowd, terminating at the start of each agent (one point per agent)
-                A single location point cloud of the entire crowd (each point represents one agent)
-                Per-Agent skeleton representation of the crowd (one location per agent, one point &
-            """
         ],
 
     },

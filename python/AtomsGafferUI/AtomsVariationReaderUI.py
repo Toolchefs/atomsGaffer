@@ -23,7 +23,7 @@ Gaffer.Metadata.registerNode(
 
             "description",
             """
-            The full path to an Atoms Agent variation file.
+            The full path to an Atoms variation file.
             """,
 
             "plugValueWidget:type", "GafferUI.FileSystemPathPlugValueWidget",

@@ -24,11 +24,8 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		Gaffer::StringPlug *namePlug();
 		const Gaffer::StringPlug *namePlug() const;
 
-		GafferScene::ScenePlug *agentsPlug();
-		const GafferScene::ScenePlug *agentsPlug() const;
-
-		Gaffer::StringPlug *attributesPlug();
-		const Gaffer::StringPlug *attributesPlug() const;
+		GafferScene::ScenePlug *variationsPlug();
+		const GafferScene::ScenePlug *variationsPlug() const;
 
 		Gaffer::BoolPlug *useInstancesPlug();
 		const Gaffer::BoolPlug *useInstancesPlug() const;
@@ -71,7 +68,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 
 		void poseAttributesHash( const ScenePath &branchPath, IECore::MurmurHash &h) const;
 
-	struct AgentScope : public Gaffer::Context::EditableScope
+		bool isDefaultAtomsMetadataName(const char* attrName) const;
+
+		struct AgentScope : public Gaffer::Context::EditableScope
 		{
 			AgentScope( const Gaffer::Context *context, const ScenePath &branchPath );
 		};

@@ -9,10 +9,6 @@
 
 #include "IECoreScene/SceneInterface.h"
 
-#include "Atoms/Variation/VariationLoader.h"
-
-#include "tbb/enumerable_thread_specific.h"
-
 namespace AtomsGaffer
 {
 

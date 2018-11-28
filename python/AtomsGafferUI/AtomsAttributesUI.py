@@ -19,25 +19,25 @@ Gaffer.Metadata.registerNode(
 
     plugs = {
 
-        "attributes.agentType" : [
+        "agentIds" : [
 
             "description",
             """
-            Used to override the Atoms agent type.
+            Filter agents using their indices.
+            Use ',' to set multiple indices (eg. 10,15,20).
+            Use '-' to set a range of indices (eg. 2-5, 10-20).
+            Use '!' to exclude some indices (eg. !5, !11).
             """,
-
-            "layout:section", "Agents",
-
+            "label", "Agent Indices",
         ],
 
-        "attributes.tint" : [
+        "metadata" : [
 
             "description",
             """
-            Used to override the Atoms tint variation.
+            Used to override or create agents metadata.
             """,
-
-            "layout:section", "Variations",
+            "label", "Metadata",
 
         ],
 

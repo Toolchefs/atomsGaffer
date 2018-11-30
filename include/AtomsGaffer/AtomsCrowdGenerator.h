@@ -30,6 +30,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		Gaffer::BoolPlug *useInstancesPlug();
 		const Gaffer::BoolPlug *useInstancesPlug() const;
 
+        Gaffer::FloatPlug *boundingBoxPaddingPlug();
+        const Gaffer::FloatPlug *boundingBoxPaddingPlug() const;
+
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 
 	protected:

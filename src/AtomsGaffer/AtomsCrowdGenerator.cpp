@@ -27,6 +27,7 @@ AtomsCrowdGenerator::AtomsCrowdGenerator( const std::string &name )
 	addChild( new StringPlug( "name", Plug::In, "agents" ) );
 	addChild( new ScenePlug( "variations" ) );
 	addChild( new BoolPlug( "useInstances" ) );
+	addChild( new FloatPlug( "boundingBoxPadding" ) );
 
 	addChild( new AtomicCompoundDataPlug( "__agentChildNames", Plug::Out, new CompoundData ) );
 }
@@ -54,12 +55,12 @@ const ScenePlug *AtomsCrowdGenerator::variationsPlug() const
 
 Gaffer::AtomicCompoundDataPlug *AtomsCrowdGenerator::agentChildNamesPlug()
 {
-	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 3);
+	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 4 );
 }
 
 const Gaffer::AtomicCompoundDataPlug *AtomsCrowdGenerator::agentChildNamesPlug() const
 {
-	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 3 );
+	return getChild<AtomicCompoundDataPlug>( g_firstPlugIndex + 4 );
 }
 
 Gaffer::BoolPlug *AtomsCrowdGenerator::useInstancesPlug()
@@ -71,6 +72,17 @@ const Gaffer::BoolPlug *AtomsCrowdGenerator::useInstancesPlug() const
 {
     return getChild<BoolPlug>( g_firstPlugIndex + 2 );
 }
+
+Gaffer::FloatPlug *AtomsCrowdGenerator::boundingBoxPaddingPlug()
+{
+	return getChild<FloatPlug>( g_firstPlugIndex + 3 );
+}
+
+const Gaffer::FloatPlug *AtomsCrowdGenerator::boundingBoxPaddingPlug() const
+{
+	return getChild<FloatPlug>( g_firstPlugIndex + 3 );
+}
+
 
 void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
@@ -100,7 +112,8 @@ void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &ou
 		input == namePlug() ||
 		input == variationsPlug()->boundPlug() ||
 		input == variationsPlug()->transformPlug() ||
-		input == agentChildNamesPlug()
+		input == agentChildNamesPlug() ||
+		input == boundingBoxPaddingPlug()
 	)
 	{
 		outputs.push_back( outPlug()->boundPlug() );
@@ -315,6 +328,7 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 
 		inPlug()->attributesPlug()->hash( h );
         inPlug()->objectPlug()->hash( h );
+        boundingBoxPaddingPlug()->hash( h );
 		agentChildNamesHash( parentPath, context, h );
 		h.append( branchPath.back() );
 		{
@@ -328,6 +342,7 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 		// "/agents/<agentName>/<id>/..."
 		AgentScope instanceScope( context, branchPath );
 		variationsPlug()->boundPlug()->hash( h );
+        boundingBoxPaddingPlug()->hash( h );
         inPlug()->boundPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
         inPlug()->objectPlug()->hash( h );
@@ -370,9 +385,10 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         Imath::Box3f result;
         if ( boxData )
         {
+            float padding  = boundingBoxPaddingPlug()->getValue();
             auto agentBox = boxData->readable();
-            result.min = agentBox.min;
-            result.max = agentBox.max;
+            result.extendBy( agentBox.min - Imath::V3f(padding, padding, padding) );
+            result.extendBy( agentBox.max + Imath::V3f(padding, padding, padding) );
         }
         else
         {

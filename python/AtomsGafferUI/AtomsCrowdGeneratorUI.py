@@ -73,6 +73,16 @@ Gaffer.Metadata.registerNode(
 
         ],
 
+        "boundingBoxPadding" : [
+
+            "description",
+            """
+            Bounding box padding
+            """,
+            "layout:section", "Bounding Box",
+            "label", "Padding"
+        ],
+
     },
 
 )

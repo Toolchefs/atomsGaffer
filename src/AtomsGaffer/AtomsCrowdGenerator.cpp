@@ -7,6 +7,8 @@
 
 #include "IECore/NullObject.h"
 
+#include "ImathEuler.h"
+
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsCrowdGenerator );
 
 using namespace IECore;
@@ -358,7 +360,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
-        auto agentData = crowd->member<const CompoundData>( branchPath[3] );
+        auto agentData = crowd->member<const CompoundData>( "atoms:agent:" +  branchPath[3].string() );
         if( !agentData )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchBound : No agent found." );
@@ -430,7 +432,7 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
-        auto agentData = crowd->member<const CompoundData>( branchPath[3] );
+        auto agentData = crowd->member<const CompoundData>( "atoms:agent:" + branchPath[3].string() );
         if( !agentData )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchTransform : No agent found." );
@@ -500,18 +502,19 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 			AgentScope instanceScope( context, branchPath );
 			baseAttributes = variationsPlug()->attributesPlug()->getValue();
 		}
-
 		// \todo: Append promoted attributes. See GafferScene::Instancer::EngineData for hints.
 		return baseAttributes;
 	}
-
 	else
 	{
 		// "/agents/<agentName>/<id>/...
 		AgentScope scope( context, branchPath );
-		return variationsPlug()->attributesPlug()->getValue();
+        CompoundObjectPtr outAttributes = variationsPlug()->attributesPlug()->getValue()->copy();
+        outAttributes->members().erase("jointIndexCount");
+        outAttributes->members().erase("jointIndices");
+        outAttributes->members().erase("jointWeights");
+        return outAttributes;
 	}
-
 }
 
 void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
@@ -528,7 +531,7 @@ void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const S
         variationsPlug()->objectPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
         inPlug()->objectPlug()->hash( h );
-		poseAttributesHash( branchPath, h );
+		poseAttributesHash( parentPath, branchPath, context, h );
 	}
 }
 
@@ -601,7 +604,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
             }
 
 
-            auto agentData = crowd->member<const CompoundData>( branchPath[3] );
+            auto agentData = crowd->member<const CompoundData>( "atoms:agent:" + branchPath[3].string() );
             if( !agentData )
             {
                 throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchObject : No agent found." );
@@ -739,6 +742,13 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 						meshNormal.z = currentNormal.z;
 					}
 
+                    // remove blend shape data
+                    result->variables.erase("blendShapeCount");
+                    for (int blendId = 0; blendId < numBlendShapes; ++blendId)
+                    {
+                        result->variables.erase("blendShape_" + std::to_string( blendId ) + "_P");
+                        result->variables.erase("blendShape_" + std::to_string( blendId ) + "_N");
+                    }
                 }
 
 
@@ -855,22 +865,34 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                             continue;
                         }
 
+                        if ( metaIt->second->typeId() == QuatdData::staticTypeId() )
+                        {
+                            V3fDataPtr vec3fData = new V3fData();
+                            auto quatdData = runTimeCast<const QuatdData>( metaIt->second );
+                            Imath::Eulerf euler;
+                            euler.extract( quatdData->readable());
+                            vec3fData->writable() = Imath::V3f(euler.x * 180.0 / M_PI, euler.y * 180.0 / M_PI, euler.z * 180.0 / M_PI);
+                            continue;
+                        }
+
                         if ( metaIt->second->typeId() == V3fVectorData::staticTypeId() ||
                              metaIt->second->typeId() == V3fVectorDataBase::staticTypeId() ||
                              metaIt->second->typeId() == FloatVectorData::staticTypeId() ||
                              metaIt->second->typeId() == BoolVectorData::staticTypeId() ||
                              metaIt->second->typeId() == IntVectorData::staticTypeId() ||
                              metaIt->second->typeId() == V2fVectorData::staticTypeId() ||
-                             metaIt->second->typeId() == M44fVectorData::staticTypeId() )
+                             metaIt->second->typeId() == M44fVectorData::staticTypeId() ||
+                             metaIt->second->typeId() == QuatfVectorData::staticTypeId())
                         {
                             continue;
                         }
-                        result->variables[metaIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, metaIt->second );
+                        result->variables["atoms:" + metaIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, metaIt->second );
                     }
                 }
 
                 if ( agentIdPointIndex != -1 )
                 {
+
                     for ( auto primIt = pointVariablesData.begin(); primIt != pointVariablesData.end(); ++primIt )
                     {
                         switch( primIt->second->typeId() )
@@ -880,7 +902,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const BoolVectorData>( primIt->second );
                                 BoolDataPtr outData = new BoolData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -889,7 +911,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const IntVectorData>( primIt->second );
                                 IntDataPtr outData = new IntData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -898,7 +920,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const FloatVectorData>( primIt->second );
                                 FloatDataPtr outData = new FloatData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -907,7 +929,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const StringVectorData>( primIt->second );
                                 StringDataPtr outData = new StringData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -916,7 +938,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const V2fVectorData>( primIt->second );
                                 V2fDataPtr outData = new V2fData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -925,7 +947,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const V3fVectorData>( primIt->second );
                                 V3fDataPtr outData = new V3fData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
@@ -934,16 +956,21 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
                                 auto data = runTimeCast<const M44fVectorData>( primIt->second );
                                 M44fDataPtr outData = new M44fData();
                                 outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
                                 break;
                             }
 
                             case IECore::TypeId::QuatfVectorDataTypeId:
                             {
+
                                 auto data = runTimeCast<const QuatfVectorData>(primIt->second);
-                                QuatfDataPtr outData = new QuatfData();
-                                outData->writable() = data->readable()[agentIdPointIndex];
-                                result->variables[primIt->first] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+                                V3fDataPtr outData = new V3fData();
+                                auto quat = data->readable()[agentIdPointIndex];
+                                Imath::Eulerf euler;
+                                euler.extract(quat);
+                                outData->writable() = Imath::V3f(euler.x * 180.0 / M_PI, euler.y * 180.0 / M_PI, euler.z * 180.0 / M_PI);
+                                result->variables["atoms:" + primIt->first.string()] = PrimitiveVariable( PrimitiveVariable::Constant, outData );
+
                                 break;
                             }
 
@@ -1002,7 +1029,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 		std::string name = namePlug()->getValue();
 		if( name.empty() )
 		{
-			return outPlug()->childNamesPlug()->defaultValue();
+            throw InvalidArgumentException( "AtomsCrowdGenerator : Input name attribute is empty" );
 		}
 		InternedStringVectorDataPtr result = new InternedStringVectorData();
 		result->writable().emplace_back( name );
@@ -1184,7 +1211,12 @@ bool AtomsCrowdGenerator::isDefaultAtomsMetadataName( const char* attrName ) con
 	ATOMS_AGENT_COLOR,
 	ATOMS_AGENT_DISABLE_IK,
 	ATOMS_AGENT_USE_CLIP_DIRECTION,
-	"_prevState"
+	"_prevState",
+	ATOMS_AGENT_VARIATION,
+	ATOMS_AGENT_LOD,
+	ATOMS_AGENT_AGENT_TYPE,
+	"agentId",
+	"orientation"
 	};
 	size_t size = sizeof( ALL_ATOMS_ATTRS ) / sizeof( ALL_ATOMS_ATTRS[0] );
 	for ( unsigned int i = 0; i < size; ++i )
@@ -1193,7 +1225,7 @@ bool AtomsCrowdGenerator::isDefaultAtomsMetadataName( const char* attrName ) con
 	return false;
 }
 
-void AtomsCrowdGenerator::poseAttributesHash( const ScenePath &branchPath, IECore::MurmurHash &h) const
+void AtomsCrowdGenerator::poseAttributesHash( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
     if ( !useInstancesPlug()->getValue() )
     {
@@ -1209,7 +1241,7 @@ void AtomsCrowdGenerator::poseAttributesHash( const ScenePath &branchPath, IECor
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
-        auto agentData = crowd->member<const CompoundData>( branchPath[3] );
+        auto agentData = crowd->member<const CompoundData>( "atoms:agent:" + branchPath[3].string() );
         if( !agentData )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : No agent found while hashing " + branchPath[3].string());
@@ -1240,5 +1272,125 @@ void AtomsCrowdGenerator::poseAttributesHash( const ScenePath &branchPath, IECor
     else
     {
         h.append( branchPath[3] );
+        return;
     }
+
+    // hash prim var on the current point
+    {
+    	int currentAgentIndex = atoi(branchPath[3].c_str());
+    	int agentIdPointIndex = -1;
+		ScenePlug::PathScope scope( context, parentPath );
+		ConstPointsPrimitivePtr points = runTimeCast<const PointsPrimitive>( inPlug()->objectPlug()->getValue() );
+
+		if ( points )
+		{
+			const auto agentId = points->variables.find( "atoms:agentId" );
+			if ( agentId == points->variables.end() )
+			{
+				throw InvalidArgumentException(
+						"AtomsAttributes : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+			}
+
+			auto agentIdData = runTimeCast<const IntVectorData>( agentId->second.data );
+			if ( !agentIdData ) {
+				throw InvalidArgumentException(
+						"AtomsAttributes : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+			}
+			std::vector<int> agentIdVec = agentIdData->readable();
+
+			for ( size_t i = 0; i < agentIdVec.size(); ++i )
+			{
+				if ( agentIdVec[i] == currentAgentIndex )
+				{
+					agentIdPointIndex = i;
+					break;
+				}
+			}
+
+			if ( agentIdPointIndex == -1 )
+			{
+				h.append( branchPath[3] );
+				return ;
+			}
+
+			// hash agent type
+            h.append( branchPath[1] );
+
+			for ( auto it = points->variables.cbegin(); it != points->variables.cend(); ++it )
+			{
+				size_t atomsIndex = it->first.find( "atoms:" );
+				if ( atomsIndex != 0 ) {
+					continue;
+				}
+
+                if ( isDefaultAtomsMetadataName( it->first.substr(6, it->first.size() - 6).c_str() ) )
+                    continue;
+
+
+				switch( it->second.data->typeId() )
+				{
+					case IECore::TypeId::BoolVectorDataTypeId:
+					{
+						auto data = runTimeCast<const BoolVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::IntVectorDataTypeId:
+					{
+						auto data = runTimeCast<const IntVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::FloatVectorDataTypeId:
+					{
+						auto data = runTimeCast<const FloatVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::StringVectorDataTypeId:
+					{
+						auto data = runTimeCast<const StringVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::V2fVectorDataTypeId:
+					{
+						auto data = runTimeCast<const V2fVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::V3fVectorDataTypeId:
+					{
+						auto data = runTimeCast<const V3fVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::M44fVectorDataTypeId:
+					{
+						auto data = runTimeCast<const M44fVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+
+					case IECore::TypeId::QuatfVectorDataTypeId:
+					{
+						auto data = runTimeCast<const QuatfVectorData>( it->second.data );
+						h.append( data->readable()[agentIdPointIndex] );
+						break;
+					}
+					default:
+					{
+						break;
+					}
+				}
+			}
+		}
+    }
+
 }

@@ -60,7 +60,7 @@ IECoreScene::PrimitiveVariable convertUvs( AtomsUtils::Mesh& mesh, AtomsUtils::M
     return PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData, indexData );
 }
 
-MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap )
+MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, bool genPref, bool genNref )
 {
     if ( !geoMap )
     {
@@ -97,8 +97,10 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap )
     MeshPrimitivePtr meshPtr = new MeshPrimitive( verticesPerFace, vertexIds, "linear", p );
 
     meshPtr->variables["N"] = convertNormals( mesh );
-    meshPtr->variables["Nref"] = meshPtr->variables["N"];
-    meshPtr->variables["Pref"] = meshPtr->variables["P"];
+    if (genNref)
+        meshPtr->variables["Nref"] = meshPtr->variables["N"];
+    if (genPref)
+        meshPtr->variables["Pref"] = meshPtr->variables["P"];
 
     auto& uvSets = mesh.uvSets();
     if ( !uvSets.empty() )
@@ -196,9 +198,20 @@ public :
     EngineData( const std::string& filePath ):
         m_filePath( filePath )
     {
+        if ( !AtomsUtils::fileExists( AtomsUtils::solvePath( filePath ).c_str() ) )
+        {
+            throw InvalidArgumentException( "AtomsVariationsReader: Invalid variation file path: " + filePath );
+        }
+
         m_variations = Atoms::loadVariationFromFile( AtomsUtils::solvePath( filePath ) );
 
         auto agentTypeNames = m_variations.getAgentTypeNames();
+        if ( agentTypeNames.empty())
+        {
+            throw InvalidArgumentException( "AtomsVariationsReader: Empty variation table found" );
+        }
+
+
         m_hierarchy = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
         for ( size_t aTypeId = 0; aTypeId != agentTypeNames.size(); ++aTypeId )
         {
@@ -378,6 +391,8 @@ AtomsVariationReader::AtomsVariationReader( const std::string &name )
 	storeIndexOfNextChild( g_firstPlugIndex );
 
 	addChild( new StringPlug( "atomsAgentFile" ) );
+    addChild( new BoolPlug( "Pref" ) );
+    addChild( new BoolPlug( "Nref" ) );
 	addChild( new IntPlug( "refreshCount" ) );
 	addChild( new ObjectPlug( "__engine", Plug::Out, NullObject::defaultNullObject() ) );
 }
@@ -392,29 +407,50 @@ const StringPlug* AtomsVariationReader::atomsAgentFilePlug() const
 	return getChild<StringPlug>( g_firstPlugIndex );
 }
 
+Gaffer::BoolPlug *AtomsVariationReader::generatePrefPlug()
+{
+    return getChild<BoolPlug>( g_firstPlugIndex +1 );
+}
+
+const Gaffer::BoolPlug *AtomsVariationReader::generatePrefPlug() const
+{
+    return getChild<BoolPlug>( g_firstPlugIndex +1 );
+}
+
+Gaffer::BoolPlug *AtomsVariationReader::generateNrefPlug()
+{
+    return getChild<BoolPlug>( g_firstPlugIndex + 2 );
+}
+
+const Gaffer::BoolPlug *AtomsVariationReader::generateNrefPlug() const
+{
+    return getChild<BoolPlug>( g_firstPlugIndex + 2 );
+}
+
 IntPlug* AtomsVariationReader::refreshCountPlug()
 {
-	return getChild<IntPlug>( g_firstPlugIndex + 1 );
+	return getChild<IntPlug>( g_firstPlugIndex + 3 );
 }
 
 const IntPlug* AtomsVariationReader::refreshCountPlug() const
 {
-	return getChild<IntPlug>( g_firstPlugIndex + 1 );
+	return getChild<IntPlug>( g_firstPlugIndex + 3 );
 }
 
 Gaffer::ObjectPlug *AtomsVariationReader::enginePlug()
 {
-	return getChild<ObjectPlug>( g_firstPlugIndex + 2 );
+	return getChild<ObjectPlug>( g_firstPlugIndex + 4 );
 }
 
 const Gaffer::ObjectPlug *AtomsVariationReader::enginePlug() const
 {
-	return getChild<ObjectPlug>( g_firstPlugIndex + 2 );
+	return getChild<ObjectPlug>( g_firstPlugIndex + 4 );
 }
 
 void AtomsVariationReader::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
-	if( input == atomsAgentFilePlug() || input == refreshCountPlug() )
+	if( input == atomsAgentFilePlug() || input == refreshCountPlug() ||
+	input == generateNrefPlug() || input == generatePrefPlug() )
 	{
 		outputs.push_back( enginePlug() );
 	}
@@ -594,7 +630,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                         result->members()["jointIndices"] = indicesData;
                         result->members()["jointWeights"] = weightsData;
                     }
-
+                    /*
                     for (auto meshAttrIt = geoMap->cbegin(); meshAttrIt != geoMap->cend(); ++meshAttrIt)
                     {
                         if ( meshAttrIt->first == "jointIndices" ||
@@ -610,6 +646,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                         if ( data )
                             result->members()[meshAttrIt->first] = data;
                     }
+                    */
                 }
                 return result;
             }
@@ -623,7 +660,8 @@ void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Cont
 	SceneNode::hashObject( path, context, parent, h );
 	atomsAgentFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
-
+    generatePrefPlug()->hash( h );
+    generateNrefPlug()->hash( h );
 	h.append( &path.front(), path.size() );
 }
 
@@ -666,7 +704,7 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
                     if ( meshIt->first == "boundingBox" )
                         continue;
                     auto geoMap = std::static_pointer_cast<AtomsCore::MapMetadata>( meshIt->second );
-                    return convertAtomsMesh( geoMap );
+                    return convertAtomsMesh( geoMap, generatePrefPlug()->getValue(),  generateNrefPlug()->getValue() );
                 }
                 return MeshPrimitive::createBox( Imath::Box3f( { -1, -1, -1 }, { 1, 1, 1 } ) );
             }

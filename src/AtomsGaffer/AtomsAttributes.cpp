@@ -222,7 +222,7 @@ void AtomsAttributes::setMetadataOnPoints(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( std::to_string( agentId ) );
+                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -306,7 +306,7 @@ void AtomsAttributes::setMetadataOnPoints<Imath::V2f, IECore::V2dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( std::to_string( agentId ) );
+                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -391,7 +391,7 @@ void AtomsAttributes::setMetadataOnPoints<Imath::V3f, IECore::V3dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( std::to_string( agentId ) );
+                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -474,7 +474,7 @@ void AtomsAttributes::setMetadataOnPoints<Imath::M44f, M44dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( std::to_string( agentId ) );
+                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;

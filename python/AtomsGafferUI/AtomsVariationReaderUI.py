@@ -36,6 +36,24 @@ Gaffer.Metadata.registerNode(
 
         ],
 
+        "Pref" : [
+
+            "description",
+            """
+            Generate Pref prim var
+            """,
+            "layout:section", "Polygon options",
+        ],
+
+        "Nref" : [
+
+            "description",
+            """
+            Generate Nref prim var
+            """,
+            "layout:section", "Polygon options",
+        ],
+
         "refreshCount" : [
 
             "description",

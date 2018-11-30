@@ -51,6 +51,11 @@ public :
             m_filePath( filePath ),
             m_frame( frame )
     {
+        if ( !AtomsUtils::fileExists( AtomsUtils::solvePath( filePath ).c_str() ) )
+        {
+            throw InvalidArgumentException( "AtomsCrowdReader: Invalid cache file path: " + filePath );
+        }
+
         m_frame = frame;
         std::string cachePath, cacheName;
         getAtomsCacheName( filePath, cachePath, cacheName, "atoms" );
@@ -417,7 +422,7 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     auto &rootMatrix = rootMatrixData->writable();
     rootMatrix.resize( numAgents );
 
-    QuatfVectorDataPtr orientationData = new QuatfVectorData;
+    V3fVectorDataPtr orientationData = new V3fVectorData;
     auto &orientation = orientationData->writable();
     orientation.resize( numAgents );
 
@@ -485,10 +490,14 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
                 auto matrices = poser.getAllWorldMatrix( pose );
                 if ( !matrices.empty() )
                 {
-                    positions[i] = matrices[0].translation();
-                    rootMatrix[i] = Imath::M44f( matrices[0] );
-
-                    orientation[i] = Imath::extractQuat(matrices[0]);
+                    auto& pelvisMtx = matrices[0];
+                    positions[i] = pelvisMtx.translation();
+                    rootMatrix[i] = Imath::M44f( pelvisMtx );
+                    Imath::Eulerd euler;
+                    euler.extract(Imath::extractQuat(pelvisMtx));
+                    orientation[i].x = euler.x * 180.0 / M_PI;
+                    orientation[i].y = euler.y * 180.0 / M_PI;
+                    orientation[i].z = euler.z * 180.0 / M_PI;
                 }
             }
             else
@@ -542,11 +551,11 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
     Box3dDataPtr cacheBox = new Box3dData;
     atomsCache.loadBoundingBox( frame, cacheBox->writable() );
-    members["boundingBox"] = cacheBox;
+    //members["atoms:boundingBox"] = cacheBox;
 
     IntVectorDataPtr agentIndices = new IntVectorData;
     agentIndices->writable() = agentIds;
-    members["agentIds"] = agentIndices;
+    //members["atoms:agentIds"] = agentIndices;
     auto& atomsAgentTypes = atomsCache.agentTypes();
     for( size_t i = 0; i < numAgents; ++i )
     {
@@ -632,7 +641,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         aTypeData->writable() = agentTypeName;
         agentCompound["agentType"] = aTypeData;
 
-        members[ std::to_string( agentId ) ] = agentCompoundData;
+        members[ "atoms:agent:" + std::to_string( agentId ) ] = agentCompoundData;
     }
 
     return result;

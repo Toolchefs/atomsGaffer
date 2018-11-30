@@ -32,6 +32,12 @@ class AtomsVariationReader : public GafferScene::SceneNode
 		Gaffer::IntPlug *refreshCountPlug();
 		const Gaffer::IntPlug *refreshCountPlug() const;
 
+		Gaffer::BoolPlug *generatePrefPlug();
+		const Gaffer::BoolPlug *generatePrefPlug() const;
+
+		Gaffer::BoolPlug *generateNrefPlug();
+		const Gaffer::BoolPlug *generateNrefPlug() const;
+
         Gaffer::ObjectPlug *enginePlug();
         const Gaffer::ObjectPlug *enginePlug() const;
 

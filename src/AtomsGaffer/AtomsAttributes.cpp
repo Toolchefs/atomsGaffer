@@ -1,4 +1,5 @@
 #include "AtomsGaffer/AtomsAttributes.h"
+#include "AtomsGaffer/AtomsObject.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
@@ -92,7 +93,6 @@ void AtomsAttributes::hashObject( const ScenePath &path, const Gaffer::Context *
     inPlug()->objectPlug()->hash( h );
     inPlug()->attributesPlug()->hash( h );
 }
-
 
 void AtomsAttributes::parseVisibleAgents( std::vector<int>& agentsFiltered,  std::vector<int>& agentIds, const std::string& filter, bool invert ) const
 {
@@ -222,7 +222,21 @@ void AtomsAttributes::setMetadataOnPoints(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
+
+
+                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
+                if( !atomsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentsData = atomsData->blindData();
+                if( !agentsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -306,7 +320,20 @@ void AtomsAttributes::setMetadataOnPoints<Imath::V2f, IECore::V2dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
+
+                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
+                if( !atomsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentsData = atomsData->blindData();
+                if( !agentsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -391,7 +418,19 @@ void AtomsAttributes::setMetadataOnPoints<Imath::V3f, IECore::V3dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
+                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
+                if( !atomsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentsData = atomsData->blindData();
+                if( !agentsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;
@@ -474,7 +513,19 @@ void AtomsAttributes::setMetadataOnPoints<Imath::M44f, M44dData>(
             for ( size_t i = 0;  i < agentIdVec.size(); ++i )
             {
                 int agentId = agentIdVec[i];
-                auto agentData = attributes->member<const CompoundData>( "atoms:agent:" + std::to_string( agentId ) );
+                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
+                if( !atomsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentsData = atomsData->blindData();
+                if( !agentsData )
+                {
+                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                }
+
+                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
                 if ( !agentData )
                 {
                     continue;

@@ -14,6 +14,8 @@ enum class TypeId
 	AtomsCrowdGeneratorTypeId = 120003,
 	AtomsAttributesTypeId = 120004,
 
+	AtomsObjectTypeId = 120005,
+
 	LastTypeId = 120499,
 };
 

@@ -1,5 +1,6 @@
 #include "AtomsGaffer/AtomsCrowdReader.h"
 #include "AtomsGaffer/AtomsMetadataTranslator.h"
+#include "AtomsGaffer/AtomsObject.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
@@ -51,11 +52,6 @@ public :
             m_filePath( filePath ),
             m_frame( frame )
     {
-        if ( !AtomsUtils::fileExists( AtomsUtils::solvePath( filePath ).c_str() ) )
-        {
-            throw InvalidArgumentException( "AtomsCrowdReader: Invalid cache file path: " + filePath );
-        }
-
         m_frame = frame;
         std::string cachePath, cacheName;
         getAtomsCacheName( filePath, cachePath, cacheName, "atoms" );
@@ -556,6 +552,10 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
     IntVectorDataPtr agentIndices = new IntVectorData;
     agentIndices->writable() = agentIds;
     //members["atoms:agentIds"] = agentIndices;
+
+    CompoundDataPtr agentsCompound = new CompoundData;
+    auto &agentsCompoundData = agentsCompound->writable();
+
     auto& atomsAgentTypes = atomsCache.agentTypes();
     for( size_t i = 0; i < numAgents; ++i )
     {
@@ -641,9 +641,13 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         aTypeData->writable() = agentTypeName;
         agentCompound["agentType"] = aTypeData;
 
-        members[ "atoms:agent:" + std::to_string( agentId ) ] = agentCompoundData;
+        //members[ "atoms:agent:" + std::to_string( agentId ) ] = agentCompoundData;
+        agentsCompoundData[ std::to_string( agentId ) ] =  agentCompoundData;
     }
 
+    //members[ "atoms:agents" ] = agentsCompound;
+    AtomsObjectPtr atomsObj = new AtomsObject(agentsCompound);
+    members[ "atoms:agents" ] = atomsObj;
     return result;
 }
 

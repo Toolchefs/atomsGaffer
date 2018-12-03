@@ -69,9 +69,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		IECore::ConstCompoundDataPtr agentChildNames( const ScenePath &parentPath, const Gaffer::Context *context ) const;
 		void agentChildNamesHash( const ScenePath &parentPath, const Gaffer::Context *context, IECore::MurmurHash &h ) const;
 
-		void poseAttributesHash( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, IECore::MurmurHash &h) const;
+		void atomsPoseHash( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, IECore::MurmurHash &h) const;
 
-		bool isDefaultAtomsMetadataName(const char* attrName) const;
+        IECore::ConstCompoundDataPtr agentCacheData(const ScenePath &branchPath) const;
 
 		struct AgentScope : public Gaffer::Context::EditableScope
 		{

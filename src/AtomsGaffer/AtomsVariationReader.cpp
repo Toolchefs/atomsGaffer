@@ -198,11 +198,6 @@ public :
     EngineData( const std::string& filePath ):
         m_filePath( filePath )
     {
-        if ( !AtomsUtils::fileExists( AtomsUtils::solvePath( filePath ).c_str() ) )
-        {
-            throw InvalidArgumentException( "AtomsVariationsReader: Invalid variation file path: " + filePath );
-        }
-
         m_variations = Atoms::loadVariationFromFile( AtomsUtils::solvePath( filePath ) );
 
         auto agentTypeNames = m_variations.getAgentTypeNames();

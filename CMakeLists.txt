@@ -19,11 +19,11 @@ endif()
 # build the library
 file( GLOB AtomsGafferSrc src/AtomsGaffer/*.cpp )
 link_directories( AtomsGaffer ${GAFFER_ROOT}/lib ${ATOMS_LIB_PATH} )
-add_library( AtomsGaffer SHARED ${AtomsGafferSrc} include/AtomsGaffer/AtomsMetadataTranslator.h)
+add_library( AtomsGaffer SHARED ${AtomsGafferSrc} )
 target_compile_definitions( AtomsGaffer PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
-target_include_directories( AtomsGaffer PRIVATE include ${GAFFER_ROOT}/include ${ATOMS_INCLUDE_PATH} ${GAFFER_ROOT}/include/OpenEXR)
-target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsProcedural)
-install( TARGETS AtomsGaffer DESTINATION lib)
+target_include_directories( AtomsGaffer PRIVATE include ${GAFFER_ROOT}/include ${ATOMS_INCLUDE_PATH} ${GAFFER_ROOT}/include/OpenEXR )
+target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsProcedural )
+install( TARGETS AtomsGaffer DESTINATION lib )
 
 # build the python bindings
 file( GLOB AtomsGafferModuleSrc src/AtomsGafferModule/*.cpp )

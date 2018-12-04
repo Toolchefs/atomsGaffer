@@ -53,6 +53,10 @@ public :
             m_frame( frame )
     {
         m_frame = frame;
+
+        if ( filePath.empty() )
+            return;
+
         std::string cachePath, cacheName;
         getAtomsCacheName( filePath, cachePath, cacheName, "atoms" );
 
@@ -644,6 +648,10 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         //members[ "atoms:agent:" + std::to_string( agentId ) ] = agentCompoundData;
         agentsCompoundData[ std::to_string( agentId ) ] =  agentCompoundData;
     }
+
+    FloatDataPtr frameOffsetData = new FloatData;
+    frameOffsetData->writable() = timeOffsetPlug()->getValue();
+    agentsCompoundData[ "frameOffset" ] = frameOffsetData;
 
     //members[ "atoms:agents" ] = agentsCompound;
     AtomsObjectPtr atomsObj = new AtomsObject(agentsCompound);

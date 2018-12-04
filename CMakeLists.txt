@@ -6,7 +6,7 @@ set(CMAKE_VERBOSE_MAKEFILE OFF)
 
 if(ATOMS_MAYA_ROOT)
     set(ATOMS_INCLUDE_PATH ${ATOMS_MAYA_ROOT}/include)
-    set(ATOMS_LIB_PATH ${ATOMS_MAYA_ROOT}/2018/lib)
+    set(ATOMS_LIB_PATH ${ATOMS_MAYA_ROOT}/lib/2018)
     set(ATOMS_ICONS_PATH ${ATOMS_MAYA_ROOT}/icons)
 endif()
 
@@ -31,7 +31,7 @@ add_library( AtomsGafferModule SHARED ${AtomsGafferModuleSrc} )
 set_target_properties( AtomsGafferModule PROPERTIES PREFIX "" OUTPUT_NAME "_AtomsGaffer" )
 target_compile_definitions( AtomsGafferModule PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
 target_link_libraries( AtomsGafferModule AtomsGaffer )
-target_include_directories( AtomsGafferModule PRIVATE include ${GAFFER_ROOT}/include ${GAFFER_ROOT}/include/python2.7 )
+target_include_directories( AtomsGafferModule PRIVATE include ${GAFFER_ROOT}/include ${GAFFER_ROOT}/include/python2.7 ${ATOMS_INCLUDE_PATH} )
 target_link_libraries( AtomsGafferModule GafferBindings )
 install( TARGETS AtomsGafferModule DESTINATION python/AtomsGaffer )
 

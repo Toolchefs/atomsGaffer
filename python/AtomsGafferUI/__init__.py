@@ -4,3 +4,4 @@ import AtomsCrowdReaderUI
 import AtomsVariationReaderUI
 import AtomsCrowdGeneratorUI
 import AtomsAttributesUI
+import AtomsCrowdClothReaderUI

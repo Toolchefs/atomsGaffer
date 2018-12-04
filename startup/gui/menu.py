@@ -8,3 +8,4 @@ nodeMenu.append( "/AtomsGaffer/AtomsCrowdReader", AtomsGaffer.AtomsCrowdReader, 
 nodeMenu.append( "/AtomsGaffer/AtomsVariationReader", AtomsGaffer.AtomsVariationReader, searchText = "AtomsVariationReader" )
 nodeMenu.append( "/AtomsGaffer/AtomsCrowdGenerator", AtomsGaffer.AtomsCrowdGenerator, searchText = "AtomsCrowdGenerator" )
 nodeMenu.append( "/AtomsGaffer/AtomsAttributes", AtomsGaffer.AtomsAttributes, searchText = "AtomsAttributes" )
+nodeMenu.append( "/AtomsGaffer/AtomsCrowdClothReader", AtomsGaffer.AtomsCrowdClothReader, searchText = "AtomsCrowdClothReader" )

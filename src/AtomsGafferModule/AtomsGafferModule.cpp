@@ -4,6 +4,7 @@
 #include "AtomsGaffer/AtomsVariationReader.h"
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
 #include "AtomsGaffer/AtomsAttributes.h"
+#include "AtomsGaffer/AtomsCrowdClothReader.h"
 
 #include "GafferBindings/DependencyNodeBinding.h"
 #include "IECore/MessageHandler.h"
@@ -56,4 +57,5 @@ BOOST_PYTHON_MODULE( _AtomsGaffer )
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsVariationReader>();
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdGenerator>();
 	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsAttributes>();
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdClothReader>();
 }

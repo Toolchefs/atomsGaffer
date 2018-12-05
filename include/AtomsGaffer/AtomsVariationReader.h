@@ -9,6 +9,10 @@
 
 #include "IECoreScene/SceneInterface.h"
 
+#include "AtomsCore/Metadata/ArrayMetadata.h"
+#include "AtomsCore/Metadata/MeshMetadata.h"
+#include "AtomsCore/Metadata/MapMetadata.h"
+
 namespace AtomsGaffer
 {
 
@@ -65,6 +69,16 @@ class AtomsVariationReader : public GafferScene::SceneNode
 		IECore::ConstPathMatcherDataPtr computeSet( const IECore::InternedString &setName, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const override;
         void compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const;
 
+	private:
+
+        void mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh ) const;
+
+		void mergeAtomsMesh(
+				AtomsPtr<AtomsCore::MapMetadata>& geoMap,
+				AtomsPtr<AtomsCore::MapMetadata>& outGeoMap,
+				AtomsPtr<AtomsCore::MeshMetadata>& outMeshMeta,
+				AtomsPtr<AtomsCore::ArrayMetadata>& outBlendMeta
+		) const;
 
 	private :
 

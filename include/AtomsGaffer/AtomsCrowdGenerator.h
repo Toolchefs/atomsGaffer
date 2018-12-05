@@ -5,6 +5,8 @@
 
 #include "GafferScene/BranchCreator.h"
 
+#include "IECoreScene/MeshPrimitive.h"
+
 #include "Gaffer/PlugType.h"
 #include "Gaffer/StringPlug.h"
 
@@ -32,6 +34,9 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 
         Gaffer::FloatPlug *boundingBoxPaddingPlug();
         const Gaffer::FloatPlug *boundingBoxPaddingPlug() const;
+
+        GafferScene::ScenePlug *clothCachePlug();
+        const GafferScene::ScenePlug *clothCachePlug() const;
 
 		void affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const override;
 
@@ -72,6 +77,35 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		void atomsPoseHash( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, IECore::MurmurHash &h) const;
 
         IECore::ConstCompoundDataPtr agentCacheData(const ScenePath &branchPath) const;
+
+        IECore::ConstCompoundDataPtr agentClothMeshData( const ScenePath &parentPath, const ScenePath &branchPath ) const;
+
+        Imath::Box3d agentClothBoudingBox( const ScenePath &parentPath, const ScenePath &branchPath ) const;
+
+        void applySkinDeformer(
+                const ScenePath &branchPath,
+                IECoreScene::MeshPrimitivePtr& result,
+                IECoreScene::ConstMeshPrimitivePtr& meshPrim,
+                IECore::ConstCompoundObjectPtr& meshAttributes,
+                const std::vector<Imath::M44d>& worldMatrices
+        		) const;
+
+        void applyBlendShapesDeformer(
+                const ScenePath &branchPath,
+                IECoreScene::MeshPrimitivePtr& result,
+                const IECore::CompoundData* metadataData,
+                const IECore::CompoundDataMap& pointVariablesData,
+                const int agentIdPointIndex
+        		) const;
+
+		bool applyClothDeformer(
+				const ScenePath &branchPath,
+				IECoreScene::MeshPrimitivePtr& result,
+				IECore::ConstCompoundDataPtr& cloth,
+				const Imath::M44f rootMatrix
+				) const;
+
+        Imath::M44f agentRootMatrix( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const;
 
 		struct AgentScope : public Gaffer::Context::EditableScope
 		{

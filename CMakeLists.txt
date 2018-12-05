@@ -31,7 +31,7 @@ add_library( AtomsGafferModule SHARED ${AtomsGafferModuleSrc} )
 set_target_properties( AtomsGafferModule PROPERTIES PREFIX "" OUTPUT_NAME "_AtomsGaffer" )
 target_compile_definitions( AtomsGafferModule PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
 target_link_libraries( AtomsGafferModule AtomsGaffer )
-target_include_directories( AtomsGafferModule PRIVATE include ${GAFFER_ROOT}/include ${GAFFER_ROOT}/include/python2.7 ${ATOMS_INCLUDE_PATH} )
+target_include_directories( AtomsGafferModule PRIVATE include ${GAFFER_ROOT}/include ${GAFFER_ROOT}/include/OpenEXR  ${GAFFER_ROOT}/include/python2.7 ${ATOMS_INCLUDE_PATH} )
 target_link_libraries( AtomsGafferModule GafferBindings )
 install( TARGETS AtomsGafferModule DESTINATION python/AtomsGaffer )
 

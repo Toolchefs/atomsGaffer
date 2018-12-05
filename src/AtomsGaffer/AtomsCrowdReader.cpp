@@ -422,7 +422,7 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     auto &rootMatrix = rootMatrixData->writable();
     rootMatrix.resize( numAgents );
 
-    V3fVectorDataPtr orientationData = new V3fVectorData;
+    QuatfVectorDataPtr orientationData = new QuatfVectorData;
     auto &orientation = orientationData->writable();
     orientation.resize( numAgents );
 
@@ -493,11 +493,14 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
                     auto& pelvisMtx = matrices[0];
                     positions[i] = pelvisMtx.translation();
                     rootMatrix[i] = Imath::M44f( pelvisMtx );
+                    orientation[i] = Imath::extractQuat( pelvisMtx );
+                    /*
                     Imath::Eulerd euler;
                     euler.extract(Imath::extractQuat(pelvisMtx));
                     orientation[i].x = euler.x * 180.0 / M_PI;
                     orientation[i].y = euler.y * 180.0 / M_PI;
                     orientation[i].z = euler.z * 180.0 / M_PI;
+                     */
                 }
             }
             else

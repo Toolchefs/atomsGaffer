@@ -12,6 +12,7 @@
 #include "AtomsUtils/Utils.h"
 
 #include <algorithm>
+#include <AtomsUtils/Logger.h>
 
 
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsAttributes );
@@ -73,8 +74,6 @@ const Gaffer::CompoundDataPlug *AtomsAttributes::metadataPlug() const
 
 void AtomsAttributes::affects( const Gaffer::Plug *input, AffectedPlugsContainer &outputs ) const
 {
-    //SceneProcessor::affects( input, outputs );
-
     if( input == inPlug()->objectPlug() ||
         input == inPlug()->attributesPlug() ||
         input == agentIdsPlug() ||
@@ -130,7 +129,7 @@ void AtomsAttributes::parseVisibleAgents( std::vector<int>& agentsFiltered,  std
         currentStr = AtomsUtils::eraseFromString( currentStr, '(' );
         currentStr = AtomsUtils::eraseFromString( currentStr, ')' );
 
-        // is a range
+        // it is a range
         if ( currentStr.find( '-' ) != std::string::npos )
         {
             std::vector<std::string> rangeEntryStr;
@@ -191,7 +190,7 @@ void AtomsAttributes::parseVisibleAgents( std::vector<int>& agentsFiltered,  std
     }
 }
 
-template <typename T, typename V>
+template <typename T, typename OUT, typename IN>
 void AtomsAttributes::setMetadataOnPoints(
         IECoreScene::PointsPrimitivePtr& primitive,
         const std::string& metadataName,
@@ -203,11 +202,12 @@ void AtomsAttributes::setMetadataOnPoints(
         ConstCompoundObjectPtr& attributes
         ) const
 {
-    typename IECore::TypedData<std::vector<T>>::Ptr  metadataVariable = nullptr;
+    typename OUT::Ptr  metadataVariable = nullptr;
+
     auto metadataVariableIt = primitive->variables.find( std::string( "atoms:" ) + metadataName );
     if( metadataVariableIt == primitive->variables.end() )
     {
-        metadataVariable = new TypedData<std::vector<T>>();
+        metadataVariable = new OUT();
         auto& defaultData = metadataVariable->writable();
         defaultData.resize( agentIdVec.size() );
 
@@ -256,9 +256,9 @@ void AtomsAttributes::setMetadataOnPoints(
                 }
 
 
-                if ( atomsMetaIt->second->typeId() == V::staticTypeId() )
+                if ( atomsMetaIt->second->typeId() == IN::staticTypeId() )
                 {
-                    defaultData[i] = runTimeCast<const V>( atomsMetaIt->second )->readable();
+                    defaultData[i] = T(runTimeCast<const IN>( atomsMetaIt->second )->readable());
                 }
 
             }
@@ -273,7 +273,7 @@ void AtomsAttributes::setMetadataOnPoints(
             return;
         }
 
-        metadataVariable = runTimeCast<TypedData<std::vector<T>>>( metadataVariableIt->second.data );
+        metadataVariable = runTimeCast<OUT>( metadataVariableIt->second.data );
     }
 
     if ( !metadataVariable )
@@ -283,295 +283,6 @@ void AtomsAttributes::setMetadataOnPoints(
 
     auto& metadataVec = metadataVariable->writable();
 
-    for ( size_t i = 0; i < agentsFiltered.size(); ++i )
-    {
-        metadataVec[agentIdPointsMapper[agentsFiltered[i]]] = data;
-    }
-}
-
-template <>
-void AtomsAttributes::setMetadataOnPoints<Imath::V2f, IECore::V2dData>(
-        IECoreScene::PointsPrimitivePtr& primitive,
-        const std::string& metadataName,
-        const std::vector<int>& agentIdVec,
-        const std::vector<int>& agentsFiltered,
-        std::map<int, int>& agentIdPointsMapper,
-        const Imath::V2f& data,
-        const Imath::V2f& defaultValue,
-        IECore::ConstCompoundObjectPtr& attributes
-) const
-{
-    V2fVectorDataPtr  metadataVariable = nullptr;
-    auto metadataVariableIt = primitive->variables.find( std::string( "atoms:" ) + metadataName );
-    if( metadataVariableIt == primitive->variables.end() )
-    {
-        metadataVariable = new V2fVectorData();
-
-        auto& defaultData = metadataVariable->writable();
-        defaultData.resize( agentIdVec.size() );
-        for ( size_t i = 0; i < defaultData.size(); ++i )
-        {
-            defaultData[i] = defaultValue;
-        }
-
-        //try to fill the data from the attributes
-        if( attributes )
-        {
-            for ( size_t i = 0;  i < agentIdVec.size(); ++i )
-            {
-                int agentId = agentIdVec[i];
-
-                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
-                if( !atomsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentsData = atomsData->blindData();
-                if( !agentsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
-                if ( !agentData )
-                {
-                    continue;
-                }
-
-                auto metadataData = agentData->member<const CompoundData>( "metadata" );
-                if ( !metadataData )
-                {
-                    continue;
-                }
-
-                auto& atomsMetaData = metadataData->readable();
-                auto atomsMetaIt = atomsMetaData.find( metadataName );
-                if ( atomsMetaIt == atomsMetaData.cend() )
-                {
-                    continue;
-                }
-
-
-                if ( atomsMetaIt->second->typeId() == V2dData::staticTypeId() )
-                {
-                    defaultData[i] = Imath::V2f( runTimeCast<const V2dData>( atomsMetaIt->second )->readable() );
-                }
-
-            }
-        }
-
-
-        primitive->variables[std::string( "atoms:" ) + metadataName] = IECoreScene::PrimitiveVariable( IECoreScene::PrimitiveVariable::Vertex, metadataVariable );
-    }
-    else
-    {
-        if ( metadataVariableIt->second.interpolation != IECoreScene::PrimitiveVariable::Vertex )
-        {
-            return;
-        }
-
-        metadataVariable = runTimeCast<V2fVectorData>( metadataVariableIt->second.data );
-    }
-
-    if ( !metadataVariable )
-    {
-        return;
-    }
-
-    auto& metadataVec = metadataVariable->writable();
-    for ( size_t i = 0; i < agentsFiltered.size(); ++i )
-    {
-        metadataVec[agentIdPointsMapper[agentsFiltered[i]]] = data;
-    }
-}
-
-
-template <>
-void AtomsAttributes::setMetadataOnPoints<Imath::V3f, IECore::V3dData>(
-        IECoreScene::PointsPrimitivePtr& primitive,
-        const std::string& metadataName,
-        const std::vector<int>& agentIdVec,
-        const std::vector<int>& agentsFiltered,
-        std::map<int, int>& agentIdPointsMapper,
-        const Imath::V3f& data,
-        const Imath::V3f& defaultValue,
-        IECore::ConstCompoundObjectPtr& attributes
-) const
-{
-    V3fVectorDataPtr  metadataVariable = nullptr;
-    auto metadataVariableIt = primitive->variables.find( std::string( "atoms:" ) + metadataName );
-    if( metadataVariableIt == primitive->variables.end() )
-    {
-        metadataVariable = new V3fVectorData();
-
-        auto& defaultData = metadataVariable->writable();
-        defaultData.resize( agentIdVec.size() );
-        for ( size_t i = 0; i < defaultData.size(); ++i )
-        {
-            defaultData[i] = defaultValue;
-        }
-
-        //try to fill the data from the attributes
-        if( attributes )
-        {
-            for ( size_t i = 0;  i < agentIdVec.size(); ++i )
-            {
-                int agentId = agentIdVec[i];
-                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
-                if( !atomsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentsData = atomsData->blindData();
-                if( !agentsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
-                if ( !agentData )
-                {
-                    continue;
-                }
-
-                auto metadataData = agentData->member<const CompoundData>( "metadata" );
-                if ( !metadataData )
-                {
-                    continue;
-                }
-
-                auto& atomsMetaData = metadataData->readable();
-                auto atomsMetaIt = atomsMetaData.find( metadataName );
-                if ( atomsMetaIt == atomsMetaData.cend() )
-                {
-                    continue;
-                }
-
-
-                if ( atomsMetaIt->second->typeId() == V3dData::staticTypeId() )
-                {
-                    defaultData[i] = Imath::V3f( runTimeCast<const V3dData>( atomsMetaIt->second )->readable() );
-                }
-
-            }
-        }
-
-
-        primitive->variables[std::string("atoms:") + metadataName] = IECoreScene::PrimitiveVariable( IECoreScene::PrimitiveVariable::Vertex, metadataVariable );
-    }
-    else
-    {
-        if ( metadataVariableIt->second.interpolation != IECoreScene::PrimitiveVariable::Vertex )
-        {
-            return;
-        }
-
-        metadataVariable = runTimeCast<V3fVectorData>( metadataVariableIt->second.data );
-    }
-
-    if ( !metadataVariable )
-    {
-        return;
-    }
-
-    auto& metadataVec = metadataVariable->writable();
-    for ( size_t i = 0; i < agentsFiltered.size(); ++i )
-    {
-        metadataVec[agentIdPointsMapper[agentsFiltered[i]]] = data;
-    }
-}
-
-template <>
-void AtomsAttributes::setMetadataOnPoints<Imath::M44f, M44dData>(
-        IECoreScene::PointsPrimitivePtr& primitive,
-        const std::string& metadataName,
-        const std::vector<int>& agentIdVec,
-        const std::vector<int>& agentsFiltered,
-        std::map<int, int>& agentIdPointsMapper,
-        const Imath::M44f& data,
-        const Imath::M44f& defaultValue,
-        ConstCompoundObjectPtr& attributes
-) const
-{
-    typename IECore::TypedData<std::vector<Imath::M44f>>::Ptr  metadataVariable = nullptr;
-    auto metadataVariableIt = primitive->variables.find( std::string( "atoms:" ) + metadataName );
-    if( metadataVariableIt == primitive->variables.end() )
-    {
-        metadataVariable = new TypedData<std::vector<Imath::M44f>>();
-
-        auto& defaultData = metadataVariable->writable();
-        defaultData.resize( agentIdVec.size() );
-        for ( size_t i = 0; i < defaultData.size(); ++i )
-        {
-            defaultData[i] = defaultValue;
-        }
-        //try to fill the data from the attributes
-        if( attributes )
-        {
-            for ( size_t i = 0;  i < agentIdVec.size(); ++i )
-            {
-                int agentId = agentIdVec[i];
-                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
-                if( !atomsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentsData = atomsData->blindData();
-                if( !agentsData )
-                {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
-                }
-
-                auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
-                if ( !agentData )
-                {
-                    continue;
-                }
-
-                auto metadataData = agentData->member<const CompoundData>( "metadata" );
-                if ( !metadataData )
-                {
-                    continue;
-                }
-
-                auto& atomsMetaData = metadataData->readable();
-                auto atomsMetaIt = atomsMetaData.find( metadataName );
-                if ( atomsMetaIt == atomsMetaData.cend() )
-                {
-                    continue;
-                }
-
-
-                if ( atomsMetaIt->second->typeId() == M44dData::staticTypeId() )
-                {
-                    defaultData[i] = Imath::M44f( runTimeCast<const M44dData>( atomsMetaIt->second )->readable() );
-                }
-
-            }
-        }
-
-
-        primitive->variables[std::string( "atoms:" ) + metadataName] = IECoreScene::PrimitiveVariable( IECoreScene::PrimitiveVariable::Vertex, metadataVariable );
-    }
-    else
-    {
-        if (metadataVariableIt->second.interpolation != IECoreScene::PrimitiveVariable::Vertex)
-        {
-            return;
-        }
-
-        metadataVariable = runTimeCast<TypedData<std::vector<Imath::M44f>>>( metadataVariableIt->second.data );
-    }
-
-    if ( !metadataVariable )
-    {
-        return;
-    }
-
-    auto& metadataVec = metadataVariable->writable();
     for ( size_t i = 0; i < agentsFiltered.size(); ++i )
     {
         metadataVec[agentIdPointsMapper[agentsFiltered[i]]] = data;
@@ -629,7 +340,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::BoolDataTypeId:
             {
                 auto data = runTimeCast<const BoolData>( it->second );
-                setMetadataOnPoints<bool, BoolData>(
+                setMetadataOnPoints<bool, BoolVectorData, BoolData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), false, attributesData
                         );
@@ -639,7 +350,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::IntDataTypeId:
             {
                 auto data = runTimeCast<const IntData>( it->second );
-                setMetadataOnPoints<int, IntData>(
+                setMetadataOnPoints<int, IntVectorData, IntData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), 0, attributesData
                         );
@@ -649,7 +360,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::FloatDataTypeId:
             {
                 auto data = runTimeCast<const FloatData>( it->second );
-                setMetadataOnPoints<float, DoubleData>(
+                setMetadataOnPoints<float, FloatVectorData, DoubleData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), 0.0, attributesData
                         );
@@ -659,7 +370,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::StringDataTypeId:
             {
                 auto data = runTimeCast<const StringData>( it->second );
-                setMetadataOnPoints<std::string, StringData>(
+                setMetadataOnPoints<std::string, StringVectorData, StringData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), "", attributesData
                         );
@@ -669,7 +380,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::V2fDataTypeId:
             {
                 auto data = runTimeCast<const V2fData>( it->second );
-                setMetadataOnPoints<Imath::V2f, V2dData>(
+                setMetadataOnPoints<Imath::V2f, V2fVectorData, V2dData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), Imath::V2f( 0.0, 0.0 ), attributesData
                         );
@@ -679,7 +390,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::V3fDataTypeId:
             {
                 auto data = runTimeCast<const V3fData>( it->second );
-                setMetadataOnPoints<Imath::V3f, V3dData>(
+                setMetadataOnPoints<Imath::V3f, V3fVectorData, V3dData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), Imath::V3f( 0.0, 0.0, 0.0 ), attributesData
                         );
@@ -689,7 +400,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::M44fDataTypeId:
             {
                 auto data = runTimeCast<const M44fData>( it->second );
-                setMetadataOnPoints<Imath::M44f, M44dData>(
+                setMetadataOnPoints<Imath::M44f, M44fVectorData, M44dData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), Imath::M44f(), attributesData
                         );
@@ -699,7 +410,7 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
             case IECore::TypeId::QuatfDataTypeId:
             {
                 auto data = runTimeCast<const QuatfData>( it->second );
-                setMetadataOnPoints<Imath::Quatf, QuatfData>(
+                setMetadataOnPoints<Imath::Quatf, QuatfVectorData, QuatfData>(
                         outCrowd, metadataName, agentIdVec, agentsFiltered,
                         agentIdPointsMapper, data->readable(), Imath::Quatf(), attributesData
                         );
@@ -714,5 +425,4 @@ IECore::ConstObjectPtr AtomsAttributes::computeObject( const ScenePath &path, co
     }
 
     return result;
-
 }

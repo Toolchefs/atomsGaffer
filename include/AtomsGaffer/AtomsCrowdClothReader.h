@@ -28,9 +28,6 @@ namespace AtomsGaffer
         Gaffer::StringPlug *atomsClothFilePlug();
         const Gaffer::StringPlug *atomsClothFilePlug() const;
 
-        Gaffer::FloatPlug *timeOffsetPlug();
-        const Gaffer::FloatPlug *timeOffsetPlug() const;
-
         Gaffer::IntPlug *refreshCountPlug();
         const Gaffer::IntPlug *refreshCountPlug() const;
 

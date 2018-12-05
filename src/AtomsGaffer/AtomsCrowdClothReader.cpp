@@ -28,7 +28,6 @@ AtomsCrowdClothReader::AtomsCrowdClothReader( const std::string &name )
     storeIndexOfNextChild( g_firstPlugIndex );
 
     addChild( new StringPlug( "atomsClothFile" ) );
-    addChild( new FloatPlug( "timeOffset" ) );
     addChild( new IntPlug( "refreshCount" ) );
 
     outPlug()->attributesPlug()->setInput( inPlug()->attributesPlug() );
@@ -50,30 +49,20 @@ const Gaffer::StringPlug *AtomsCrowdClothReader::atomsClothFilePlug() const
     return getChild<StringPlug>( g_firstPlugIndex );
 }
 
-Gaffer::FloatPlug *AtomsCrowdClothReader::timeOffsetPlug()
-{
-    return getChild<FloatPlug>( g_firstPlugIndex  + 1 );
-}
-
-const Gaffer::FloatPlug *AtomsCrowdClothReader::timeOffsetPlug() const
-{
-    return getChild<FloatPlug>( g_firstPlugIndex  + 1 );
-}
-
 IntPlug* AtomsCrowdClothReader::refreshCountPlug()
 {
-    return getChild<IntPlug>( g_firstPlugIndex + 2 );
+    return getChild<IntPlug>( g_firstPlugIndex + 1 );
 }
 
 const IntPlug* AtomsCrowdClothReader::refreshCountPlug() const
 {
-    return getChild<IntPlug>( g_firstPlugIndex + 2 );
+    return getChild<IntPlug>( g_firstPlugIndex + 1 );
 }
 
 void AtomsCrowdClothReader::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
     if( input == inPlug()->objectPlug() || input == inPlug()->attributesPlug() ||
-        input == atomsClothFilePlug() || input == refreshCountPlug() || input == timeOffsetPlug() )
+        input == atomsClothFilePlug() || input == refreshCountPlug() )
     {
         outputs.push_back( outPlug()->objectPlug() );
     }
@@ -85,7 +74,6 @@ void AtomsCrowdClothReader::hashObject( const ScenePath &path, const Gaffer::Con
     inPlug()->attributesPlug()->hash( h );
     atomsClothFilePlug()->hash( h );
     refreshCountPlug()->hash( h );
-    timeOffsetPlug()->hash( h );
     h.append( context->getFrame() );
 }
 
@@ -121,75 +109,92 @@ ConstObjectPtr AtomsCrowdClothReader::computeObject( const ScenePath &path, cons
         }
     }
 
-
-    Atoms::AtomsClothCache m_cache;
+    Atoms::AtomsClothCache cache;
     std::string cachePath, cacheName;
     std::string filePath = atomsClothFilePlug()->getValue();
-    double m_frame = context->getFrame() + timeOffsetPlug()->getValue() + frameOffset;
+    double frame = context->getFrame() + frameOffset;
 
     getAtomsCacheName( filePath, cachePath, cacheName, "clothcache" );
 
-    if( !m_cache.openCache( cachePath, cacheName ) )
+    if( !cache.openCache( cachePath, cacheName ) )
     {
         IECore::msg( IECore::Msg::Warning, "AtomsCrowdReader", "Unable to load the atoms cache " + cachePath + "/" + cacheName + ".atoms" );
         return NullObject::defaultNullObject();
     }
 
-    m_frame = m_frame < m_cache.startFrame() ? m_cache.startFrame() : m_frame;
-    m_frame = m_frame > m_cache.endFrame() ? m_cache.endFrame() : m_frame;
+    frame = frame < cache.startFrame() ? cache.startFrame() : frame;
+    frame = frame > cache.endFrame() ? cache.endFrame() : frame;
 
-    int cacheFrame = static_cast<int>( m_frame );
-    double frameReminder = m_frame - cacheFrame;
+    int cacheFrame = static_cast<int>( frame );
+    double frameReminder = frame - cacheFrame;
 
     if ( agentIdVec )
     {
-        m_cache.setAgentsToLoad( *agentIdVec );
+        cache.setAgentsToLoad( *agentIdVec );
     }
 
-    m_cache.loadFrame( cacheFrame );
+    cache.loadFrame( cacheFrame );
     if ( frameReminder > 0.0 )
-        m_cache.loadNextFrame( cacheFrame + 1 );
+        cache.loadNextFrame( cacheFrame + 1 );
 
-    auto m_agentIds = m_cache.agentIds( cacheFrame );
-
-    //extract the ids, variation, lod, position, direction and velocity and bbox and store them on points
+    auto agentIds = cache.agentIds( cacheFrame );
 
     CompoundDataPtr clothCompound = new CompoundData;
     auto& clothData = clothCompound->writable();
-    for (auto agentId: m_agentIds )
+    for (auto agentId: agentIds )
     {
         CompoundDataPtr agentCompound = new CompoundData;
         auto& agentData = agentCompound->writable();
-        /*
-        std::vector<std::string> meshNames = m_cache.agentClothMeshNames( m_frame, agentId );
+
+        std::vector<std::string> meshNames;
+
+        std::string agentIdStr = std::to_string(agentId);
+
+        auto frameData = cache.frameData();
+        if ( frameData )
+        {
+            AtomsPtr<AtomsCore::MapMetadata> agentClothData = frameData->getTypedEntry<AtomsCore::MapMetadata>( agentIdStr );
+            if ( !agentClothData )
+            {
+                agentClothData = frameData->getTypedEntry<AtomsCore::MapMetadata>("*");
+            }
+            if ( agentClothData )
+            {
+                meshNames = agentClothData->getKeys();
+            }
+        }
+
         for( const auto& meshName: meshNames )
         {
             CompoundDataPtr meshCompound = new CompoundData;
             auto& meshData = meshCompound->writable();
 
-
             V3dVectorDataPtr p = new V3dVectorData;
             V3dVectorDataPtr n = new V3dVectorData;
             Box3dDataPtr bbox = new Box3dData;
+            StringDataPtr stackOrder = new StringData;
 
-            m_cache.loadAgentClothMesh( m_frame, agentId, meshName, p->writable(), n->writable() );
-            m_cache.loadAgentClothMeshBoundingBox( m_frame, agentId, meshName, bbox->writable() );
+            cache.loadAgentClothMesh( frame, agentId, meshName, p->writable(), n->writable() );
+            cache.loadAgentClothMeshBoundingBox( frame, agentId, meshName, bbox->writable() );
+            stackOrder->writable() = cache.getAgentClothMeshStackOrder( frame, agentId, meshName );
 
             meshData[ "P" ] = p;
             meshData[ "N" ] = n;
             meshData[ "boundingBox" ] = bbox;
+            meshData[ "stackOrder" ] = stackOrder;
 
             agentData[ meshName ] = meshCompound;
-
         }
-        */
-        clothData[ std::to_string(agentId) ] = agentCompound;
+
+        Box3dDataPtr bbox = new Box3dData;
+        cache.loadAgentClothBoundingBox( frame, agentId, bbox->writable() );
+        agentData[ "boundingBox" ] = bbox;
+
+        clothData[ agentIdStr ] = agentCompound;
     }
 
     AtomsObjectPtr result = new AtomsObject( clothCompound );
     return result;
-
-
 }
 
 void AtomsCrowdClothReader::getAtomsCacheName( const std::string& filePath, std::string& cachePath, std::string& cacheName, const std::string& extension ) const

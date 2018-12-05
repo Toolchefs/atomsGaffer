@@ -45,7 +45,7 @@ class AtomsAttributes : public GafferScene::SceneProcessor
 
         void parseVisibleAgents( std::vector<int>& agentsFiltered, std::vector<int>& agentIds, const std::string& filter, bool invert = false ) const;
 
-        template <typename T, typename V>
+        template <typename T, typename OUT, typename IN>
         void setMetadataOnPoints(
                 IECoreScene::PointsPrimitivePtr& primitive,
                 const std::string& metadataName,
@@ -62,7 +62,7 @@ class AtomsAttributes : public GafferScene::SceneProcessor
         static size_t g_firstPlugIndex;
 
 };
-
+/*
 template <>
 void AtomsAttributes::setMetadataOnPoints<Imath::V2f, IECore::V2dData>(
         IECoreScene::PointsPrimitivePtr& primitive,
@@ -86,19 +86,7 @@ void AtomsAttributes::setMetadataOnPoints<Imath::V3f, IECore::V3dData>(
         const Imath::V3f& defaultValue,
         IECore::ConstCompoundObjectPtr& attributes
 ) const;
-
-template <>
-void AtomsAttributes::setMetadataOnPoints<Imath::M44f, IECore::M44dData>(
-        IECoreScene::PointsPrimitivePtr& primitive,
-        const std::string& metadataName,
-        const std::vector<int>& agentIdVec,
-        const std::vector<int>& agentsFiltered,
-        std::map<int, int>& agentIdPointsMapper,
-        const Imath::M44f& data,
-        const Imath::M44f& defaultValue,
-        IECore::ConstCompoundObjectPtr& attributes
-) const;
-
+*/
 } // namespace AtomsGaffer
 
 #endif // ATOMSGAFFER_ATOMSATTRIBUTES_H

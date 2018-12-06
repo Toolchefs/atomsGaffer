@@ -509,10 +509,13 @@ void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, con
             AgentScope instanceScope( context, branchPath );
             variationsPlug()->attributesPlug()->hash( h );
         }
+
+        inPlug()->objectPlug()->hash( h );
+
         auto agentData = agentCacheData(branchPath);
         auto metadataData = agentData->member<const CompoundData>( "metadata" );
         auto& metadataMap = metadataData->readable();
-        for (auto memberIt =metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt)
+        for (auto memberIt = metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt)
         {
             memberIt->second->hash( h );
         }
@@ -536,12 +539,53 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 
 	else if( branchPath.size() == 4 )
 	{
+
+        ConstCompoundObjectPtr agentTypeAttributes;
+        ConstCompoundObjectPtr variationAttributes;
+	    // get attributes from the agent type
+        {
+            ScenePath agentTypePath;
+            agentTypePath.push_back( branchPath[0] );
+            agentTypePath.push_back( branchPath[1] );
+            AgentScope scope(context, agentTypePath);
+            agentTypeAttributes = variationsPlug()->attributesPlug()->getValue();
+        }
+
+        // get attributes from the agent variation
+        {
+            ScenePath agentTypePath;
+            agentTypePath.push_back( branchPath[0] );
+            agentTypePath.push_back( branchPath[1] );
+            agentTypePath.push_back( branchPath[2] );
+            AgentScope scope(context, agentTypePath);
+            variationAttributes = variationsPlug()->attributesPlug()->getValue();
+        }
+
 		// "/agents/<agentName>/<id>"
 		CompoundObjectPtr baseAttributes = new CompoundObject;
+        auto& objMap = baseAttributes->members();
+
+        if ( agentTypeAttributes )
+        {
+            auto& agentTypeAttributesData = agentTypeAttributes->members();
+            for ( auto attrIt = agentTypeAttributesData.cbegin(); attrIt != agentTypeAttributesData.cend(); ++attrIt )
+            {
+                objMap[attrIt->first] = attrIt->second->copy();
+            }
+        }
+
+        if ( variationAttributes )
+        {
+            auto& variationAttributesData = variationAttributes->members();
+            for ( auto attrIt = variationAttributesData.cbegin(); attrIt != variationAttributesData.cend(); ++attrIt )
+            {
+                objMap[attrIt->first] = attrIt->second->copy();
+            }
+        }
 
         auto agentData = agentCacheData(branchPath);
         auto metadataData = agentData->member<const CompoundData>( "metadata" );
-        auto& objMap = baseAttributes->members();
+
         auto& metadataMap = metadataData->readable();
         for (auto memberIt = metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt)
         {
@@ -1055,15 +1099,17 @@ void AtomsCrowdGenerator::agentChildNamesHash( const ScenePath &parentPath, cons
 AtomsCrowdGenerator::AgentScope::AgentScope( const Gaffer::Context *context, const ScenePath &branchPath )
 	:	EditableScope( context )
 {
-    assert( branchPath.size() >= 3 );
 	ScenePath agentPath;
 	agentPath.reserve( 1 + ( branchPath.size() > 4 ? branchPath.size() - 4 : 0 ) );
-	agentPath.push_back( branchPath[1] );
-    agentPath.push_back( branchPath[2] );
+    if( branchPath.size() > 1 )
+	    agentPath.push_back( branchPath[1] );
+    if( branchPath.size() > 2 )
+        agentPath.push_back( branchPath[2] );
 	if( branchPath.size() > 4 )
 	{
 		agentPath.insert( agentPath.end(), branchPath.begin() + 4, branchPath.end() );
 	}
+
 	set( ScenePlug::scenePathContextName, agentPath );
 }
 

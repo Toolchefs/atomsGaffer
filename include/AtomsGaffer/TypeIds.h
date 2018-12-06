@@ -12,9 +12,10 @@ enum class TypeId
 	AtomsCrowdReaderTypeId = 120001,
 	AtomsVariationReaderTypeId = 120002,
 	AtomsCrowdGeneratorTypeId = 120003,
-	AtomsAttributesTypeId = 120004,
+	AtomsMetadataTypeId = 120004,
 	AtomsObjectTypeId = 120005,
 	AtomsCrowdClothReaderTypeId = 120006,
+	AtomsAttributesTypeId = 120007,
 
 	LastTypeId = 120499,
 };

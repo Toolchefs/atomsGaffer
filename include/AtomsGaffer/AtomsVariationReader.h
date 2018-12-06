@@ -71,7 +71,7 @@ class AtomsVariationReader : public GafferScene::SceneNode
 
 	private:
 
-        void mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh ) const;
+        void mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh, size_t startSize ) const;
 
 		void mergeAtomsMesh(
 				AtomsPtr<AtomsCore::MapMetadata>& geoMap,

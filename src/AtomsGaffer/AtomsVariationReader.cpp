@@ -49,15 +49,14 @@ IECoreScene::PrimitiveVariable convertUvs( AtomsUtils::Mesh& mesh, AtomsUtils::M
 {
     auto& inIndices = uvSet.uvIndices;
 
-    IntVectorDataPtr indexData = new IntVectorData;
-    vector<int> &indices = indexData->writable();
-    indices.insert( indices.begin(),  inIndices.begin(), inIndices.end() );
-
     V2fVectorDataPtr uvData = new V2fVectorData;
     uvData->setInterpretation( GeometricData::UV );
-    uvData->writable() = uvSet.uvs;
+    auto& outUV = uvData->writable();
+    outUV.reserve( inIndices.size() );
+    for ( auto id: inIndices )
+        outUV.push_back( uvSet.uvs[id] );
 
-    return PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData, indexData );
+    return PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData );
 }
 
 MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, bool genPref, bool genNref )
@@ -102,8 +101,8 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
     if (genPref)
         meshPtr->variables["Pref"] = meshPtr->variables["P"];
 
-    /*
-     This is not supported at the moment by cortex/gaffer
+
+    // This is not supported at the moment by cortex/gaffer
     auto& uvSets = mesh.uvSets();
     if ( !uvSets.empty() )
     {
@@ -112,20 +111,18 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
             auto &uvSet = uvSets[i];
             auto uvPrim = convertUvs( mesh, uvSet );
             meshPtr->variables[uvSet.name] = uvPrim;
-
             if (i == 0) {
                 meshPtr->variables["uv"] = uvPrim;
             }
         }
     }
     else
-    */
     {
         V2fVectorDataPtr uvData = new V2fVectorData;
         uvData->setInterpretation( GeometricData::UV );
         uvData->writable() = mesh.uvs();
 
-        meshPtr->variables["uv"] = PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData, vertexIds );
+        meshPtr->variables["uv"] = PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData );
     }
 
     auto blendShapes = geoMap->getTypedEntry<const AtomsCore::ArrayMetadata>("blendShapes");
@@ -1066,7 +1063,7 @@ void AtomsVariationReader::compute( Gaffer::ValuePlug *output, const Gaffer::Con
 	SceneNode::compute(output, context);
 }
 
-void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh ) const
+void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh, size_t startSize ) const
 {
     for ( auto &uvSet: inMesh.uvSets() )
     {
@@ -1087,13 +1084,36 @@ void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh
             uvData->name = uvSet.name;
         }
 
-        size_t currentUVIndicesSize = uvData->uvIndices.size();
-        size_t currentUVSize = uvData->uvs.size();
-        uvData->uvs.insert( uvData->uvs.end(), uvSet.uvs.begin(), uvSet.uvs.end() );
-        uvData->uvIndices.resize( currentUVIndicesSize + uvSet.uvIndices.size() );
-        for (size_t uvId = 0; uvId < uvSet.uvIndices.size(); ++uvId)
+        if ( uvData->uvs.size() < startSize )
         {
-            uvData->uvIndices[ currentUVIndicesSize + uvId]  = uvSet.uvIndices[uvId] + currentUVSize;
+            size_t fillUvsSize = startSize - uvData->uvs.size();
+            for ( size_t uvId = 0; uvId < fillUvsSize; ++uvId )
+            {
+                uvData->uvIndices.push_back( uvData->uvs.size() );
+                uvData->uvs.push_back( Imath::V2f( 0.0, 0.0 ) );
+            }
+        }
+
+        // Flat uv data,
+        auto& uvVec = uvSet.uvs;
+        auto& uvIndicesVec = uvSet.uvIndices;
+        for ( auto id: uvIndicesVec )
+        {
+            uvData->uvIndices.push_back( uvData->uvs.size() );
+            uvData->uvs.push_back( uvVec[id] );
+        }
+    }
+
+    for ( auto &uvSet: mesh.uvSets() )
+    {
+        if ( uvSet.uvs.size() < mesh.normals().size() )
+        {
+            size_t fillUvsSize = mesh.normals().size() - uvSet.uvs.size();
+            for ( size_t uvId = 0; uvId < fillUvsSize; ++uvId )
+            {
+                uvSet.uvs.push_back( Imath::V2f( 0.0, 0.0 ) );
+                uvSet.uvIndices.push_back( uvSet.uvs.size() );
+            }
         }
     }
 }
@@ -1131,7 +1151,9 @@ void AtomsVariationReader::mergeAtomsMesh(
     mesh.vertexCount().insert( mesh.vertexCount().end(), inMesh.vertexCount().begin(), inMesh.vertexCount().end() );
     mesh.jointIndices().insert( mesh.jointIndices().end(), inMesh.jointIndices().begin(), inMesh.jointIndices().end() );
     mesh.jointWeights().insert( mesh.jointWeights().end(), inMesh.jointWeights().begin(), inMesh.jointWeights().end() );
-    mesh.uvs().insert( mesh.uvs().end(), inMesh.uvs().begin(), inMesh.uvs().end() );
+
+
+
 
     auto& inIndices = inMesh.indices();
     auto& outIndices = mesh.indices();
@@ -1141,8 +1163,15 @@ void AtomsVariationReader::mergeAtomsMesh(
         outIndices[ currentIndicesSize + id]  = inIndices[id] + currentPointsSize;
     }
 
+    auto& outUV = mesh.uvs();
+    outUV.insert( outUV.end(), inMesh.uvs().begin(), inMesh.uvs().end() );
+    if ( outUV.size() < mesh.normals().size() )
+    {
+        outUV.resize( mesh.normals().size() );
+    }
+
     // merge the uv sets
-    mergeUvSets( mesh, inMesh );
+    mergeUvSets( mesh, inMesh, currentNormalsSize );
 
     // merge the blend shapes
     auto blendShapes = geoMap->getTypedEntry<const AtomsCore::ArrayMetadata>("blendShapes");

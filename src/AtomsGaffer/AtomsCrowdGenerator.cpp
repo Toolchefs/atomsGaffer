@@ -489,7 +489,7 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
 	}
 	else
 	{
-		// "/agents/<agentName>/<id>/..."
+		// "/agents/<agentName>/<variaiton>/<id>/..."
 		AgentScope scope( context, branchPath );
 		return variationsPlug()->transformPlug()->getValue();
 	}
@@ -497,11 +497,23 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
 
 void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
-	if( branchPath.size() < 4 )
+	if( branchPath.size() < 1 )
 	{
-		// "/" or "/agents" or "/agents/<agentName>"
+        // "/" or "/agents"
 		h = outPlug()->attributesPlug()->defaultValue()->Object::hash();
 	}
+	else if ( branchPath.size() == 2 )
+    {
+        // "/agents/<agentType>"
+        AgentScope instanceScope( context, branchPath );
+        variationsPlug()->attributesPlug()->hash( h );
+    }
+    else if ( branchPath.size() == 3 )
+    {
+        // "/agents/<agentType>/<variation>"
+        AgentScope instanceScope( context, branchPath );
+        variationsPlug()->attributesPlug()->hash( h );
+    }
     else if( branchPath.size() == 4 )
     {
         BranchCreator::hashBranchAttributes( parentPath, branchPath, context, h );
@@ -526,62 +538,32 @@ void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, con
 		AgentScope instanceScope( context, branchPath );
 		variationsPlug()->attributesPlug()->hash( h );
 	}
-
 }
 
 ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
-	if( branchPath.size() < 4 )
+	if( branchPath.size() < 2 )
 	{
 		// "/" or "/agents" or "/agents/<agentName>"
 		return outPlug()->attributesPlug()->defaultValue();
 	}
-
+    else if ( branchPath.size() == 2 )
+    {
+        // "/agents/<agentType>"
+        AgentScope scope(context, branchPath);
+        return variationsPlug()->attributesPlug()->getValue();
+    }
+    else if ( branchPath.size() == 3 )
+    {
+        // "/agents/<agentType>/<variation>"
+        AgentScope scope(context, branchPath);
+        return variationsPlug()->attributesPlug()->getValue();
+    }
 	else if( branchPath.size() == 4 )
 	{
-
-        ConstCompoundObjectPtr agentTypeAttributes;
-        ConstCompoundObjectPtr variationAttributes;
-	    // get attributes from the agent type
-        {
-            ScenePath agentTypePath;
-            agentTypePath.push_back( branchPath[0] );
-            agentTypePath.push_back( branchPath[1] );
-            AgentScope scope(context, agentTypePath);
-            agentTypeAttributes = variationsPlug()->attributesPlug()->getValue();
-        }
-
-        // get attributes from the agent variation
-        {
-            ScenePath agentTypePath;
-            agentTypePath.push_back( branchPath[0] );
-            agentTypePath.push_back( branchPath[1] );
-            agentTypePath.push_back( branchPath[2] );
-            AgentScope scope(context, agentTypePath);
-            variationAttributes = variationsPlug()->attributesPlug()->getValue();
-        }
-
-		// "/agents/<agentName>/<id>"
+		// "/agents/<agentType>/<variation>/<id>"
 		CompoundObjectPtr baseAttributes = new CompoundObject;
         auto& objMap = baseAttributes->members();
-
-        if ( agentTypeAttributes )
-        {
-            auto& agentTypeAttributesData = agentTypeAttributes->members();
-            for ( auto attrIt = agentTypeAttributesData.cbegin(); attrIt != agentTypeAttributesData.cend(); ++attrIt )
-            {
-                objMap[attrIt->first] = attrIt->second->copy();
-            }
-        }
-
-        if ( variationAttributes )
-        {
-            auto& variationAttributesData = variationAttributes->members();
-            for ( auto attrIt = variationAttributesData.cbegin(); attrIt != variationAttributesData.cend(); ++attrIt )
-            {
-                objMap[attrIt->first] = attrIt->second->copy();
-            }
-        }
 
         auto agentData = agentCacheData(branchPath);
         auto metadataData = agentData->member<const CompoundData>( "metadata" );

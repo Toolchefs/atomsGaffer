@@ -96,13 +96,12 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
     MeshPrimitivePtr meshPtr = new MeshPrimitive( verticesPerFace, vertexIds, "linear", p );
 
     meshPtr->variables["N"] = convertNormals( mesh );
-    if (genNref)
+    if ( genNref )
         meshPtr->variables["Nref"] = meshPtr->variables["N"];
-    if (genPref)
+    if ( genPref )
         meshPtr->variables["Pref"] = meshPtr->variables["P"];
 
-
-    // This is not supported at the moment by cortex/gaffer
+    // Convert uv sets data
     auto& uvSets = mesh.uvSets();
     if ( !uvSets.empty() )
     {
@@ -125,6 +124,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
         meshPtr->variables["uv"] = PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData );
     }
 
+    // Convert blend shape data
     auto blendShapes = geoMap->getTypedEntry<const AtomsCore::ArrayMetadata>("blendShapes");
     if ( blendShapes && blendShapes->size() > 0 )
     {
@@ -173,7 +173,8 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
         meshPtr->variables["blendShapeCount"] =  PrimitiveVariable( PrimitiveVariable::Constant, blendShapeCount );
     }
 
-    auto atomsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>("atoms");
+    // Convert the atoms metadata
+    auto atomsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "atoms" );
     if ( atomsMap && atomsMap->size() > 0 )
     {
         auto &translator = AtomsMetadataTranslator::instance();
@@ -217,6 +218,8 @@ public :
             throw InvalidArgumentException( "AtomsVariationsReader: " + filePath + " is empty" );
         }
 
+        // Atoms can export mesh using full path as name
+        // In Gaffer the full path is built so this build a tree containing the full hierarchy of all the meshes
         for ( size_t aTypeId = 0; aTypeId != agentTypeNames.size(); ++aTypeId )
         {
             const auto& agentTypeName = agentTypeNames[aTypeId];
@@ -250,6 +253,7 @@ public :
                     if (agentTypeIt->second.find( geoPtr->getGeometryFile() + ":" +geoPtr->getGeometryFilter() ) == agentTypeIt->second.end() )
                         continue;
 
+                    // Split the full path geo name to build the full hierarchy
                     std::vector<std::string> objectNames;
                     AtomsUtils::splitString( combination.first, '|', objectNames );
 
@@ -305,10 +309,12 @@ public :
                 AtomsPtr<const AtomsCore::MapMetadata> atomsMapPtr = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "atoms" );
                 if ( atomsMapPtr )
                 {
+                    // Skip this mesh if it hase the cloth hide tag
                     auto hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>( ATOMS_CLOTH_HIDE_MESH );
                     if ( hideMeshPtr && hideMeshPtr->value() )
                         continue;
 
+                    // Skip this mesh if it has the preview tag
                     hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>( ATOMS_PREVIEW_MESH );
                     if ( hideMeshPtr && hideMeshPtr->value() )
                         continue;
@@ -550,6 +556,7 @@ void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::C
 
 Imath::M44f AtomsVariationReader::computeTransform( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent ) const
 {
+    // The Atoms mesh are stored in world space without transformation
 	return {};
 }
 
@@ -632,6 +639,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
         if ( !geoMap )
             continue;
 
+        // Store the skin data as attributes
         auto jointWeightsAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>("jointWeights");
         auto jointIndicesAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>("jointIndices");
         if ( jointWeightsAttr && jointIndicesAttr && jointWeightsAttr->size() == jointIndicesAttr->size() )
@@ -650,6 +658,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
             }
         }
 
+        // Convert the atoms metadata to gaffer attribute
         auto atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "atoms" );
         if ( atomsAttributeMap )
         {
@@ -663,7 +672,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
             }
         }
 
-
+        // Convert the arnold metadata to gaffer attribute
         atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "arnold" );
         if ( !atomsAttributeMap )
         {
@@ -678,6 +687,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                 continue;
             }
 
+            // Convert the arnold visible_in_* attribute to ai:visibility:*
             std::string aiParameter = meshAttrIt->first;
             auto visIndex = meshAttrIt->first.find( "visible_in_");
             bool handleParam = false;
@@ -687,6 +697,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                 handleParam = true;
             }
 
+            // Convert the arnold subdiv* attribute to ai:polymesh:*
             visIndex = meshAttrIt->first.find( "subdiv");
             if ( visIndex != std::string::npos )
             {
@@ -694,6 +705,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                 handleParam = true;
             }
 
+            // Sett only polymesh arnold attributes
             if ( handleParam ||
                 (meshAttrIt->first == "sidedness" ||
                 meshAttrIt->first == "receive_shadows" ||
@@ -733,6 +745,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
 
     if ( indexCount.size() > 0 )
     {
+        // Store the skin data
         result->members()["jointIndexCount"] = indexCountData;
         result->members()["jointIndices"] = indicesData;
         result->members()["jointWeights"] = weightsData;
@@ -802,6 +815,8 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
     AtomsPtr<AtomsCore::MeshMetadata> outMeshMeta( new AtomsCore::MeshMetadata );
     AtomsPtr<AtomsCore::ArrayMetadata> outBlendMeta( new AtomsCore::ArrayMetadata );
     AtomsUtils::Mesh& mesh = outMeshMeta->get();
+
+    // A single .geos file could contain multiple mesh, se we need to merge those mesh together
     for ( auto meshIt = atomsGeo->begin(); meshIt!= atomsGeo->end(); ++meshIt )
     {
         if ( meshIt->first == "boundingBox" )
@@ -854,6 +869,7 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames
     }
     else
     {
+        // Use the full hierarchy computed at the beginning to build the locations structure
         AtomsPtr<const AtomsCore::MapMetadata> currentPath = hierarchy;
         for ( const auto& name: path )
         {
@@ -1065,6 +1081,7 @@ void AtomsVariationReader::compute( Gaffer::ValuePlug *output, const Gaffer::Con
 
 void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh, size_t startSize ) const
 {
+    // Merge uv sets
     for ( auto &uvSet: inMesh.uvSets() )
     {
         AtomsUtils::Mesh::UVData* uvData = nullptr;
@@ -1084,6 +1101,7 @@ void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh
             uvData->name = uvSet.name;
         }
 
+        // we need to fill the missing uv data before copy the uv set
         if ( uvData->uvs.size() < startSize )
         {
             size_t fillUvsSize = startSize - uvData->uvs.size();
@@ -1153,8 +1171,6 @@ void AtomsVariationReader::mergeAtomsMesh(
     mesh.jointWeights().insert( mesh.jointWeights().end(), inMesh.jointWeights().begin(), inMesh.jointWeights().end() );
 
 
-
-
     auto& inIndices = inMesh.indices();
     auto& outIndices = mesh.indices();
     outIndices.resize( currentIndicesSize + inIndices.size() );
@@ -1170,10 +1186,10 @@ void AtomsVariationReader::mergeAtomsMesh(
         outUV.resize( mesh.normals().size() );
     }
 
-    // merge the uv sets
+    // Merge the uv sets
     mergeUvSets( mesh, inMesh, currentNormalsSize );
 
-    // merge the blend shapes
+    // Merge the blend shapes
     auto blendShapes = geoMap->getTypedEntry<const AtomsCore::ArrayMetadata>("blendShapes");
     if ( !( blendShapes && blendShapes->size() > 0 ) )
     {

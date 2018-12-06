@@ -66,17 +66,20 @@ public :
             return;
         }
 
+        // Clamp the frame
         m_frame = m_frame < m_cache.startFrame() ? m_cache.startFrame() : m_frame;
         m_frame = m_frame > m_cache.endFrame() ? m_cache.endFrame() : m_frame;
 
         int cacheFrame = static_cast<int>( m_frame );
         double frameReminder = m_frame - cacheFrame;
 
+        // Load the frame haeder that contains the agent ids
         m_cache.loadFrameHeader( cacheFrame );
 
         // filter agents
         std::vector<int> agentsIds;
-        parseVisibleAgents( agentsIds, AtomsUtils::eraseFromString(agentIdsStr, ' ') );
+        // Filter the agnet id based on the input expression
+        parseVisibleAgents( agentsIds, AtomsUtils::eraseFromString( agentIdsStr, ' ' ) );
         if ( !agentsIds.empty() ) {
             m_cache.setAgentsToLoad( agentsIds );
             m_agentIds = agentsIds;
@@ -86,14 +89,16 @@ public :
             m_agentIds = m_cache.agentIds( cacheFrame );
         }
 
+        // Load the pose and metadata
         m_cache.loadFrame( cacheFrame );
         if ( frameReminder > 0.0 )
             m_cache.loadNextFrame( cacheFrame + 1 );
 
+        // Load the agent types in memory
         for( size_t i = 0; i < m_agentIds.size(); ++i )
         {
             int agentId = m_agentIds[i];
-            // load in memory the agent type since the cache need this to interpolate the pose
+            // load in memory the agent type since you need the skeleton to extract the world matrices from the pose
             const std::string &agentTypeName = m_cache.agentType( m_frame, agentId );
             m_cache.loadAgentType( agentTypeName, false );
         }
@@ -151,6 +156,7 @@ public :
 
     void parseVisibleAgents( std::vector<int>& agentsFiltered, const std::string& agentIdsStr )
     {
+        // The input filter accept '-' to set a range of ids, and ! to exclude an id or a range of ids
         std::vector<std::string> idsEntryStr;
         AtomsUtils::splitString( agentIdsStr, ',', idsEntryStr );
         std::vector<int> idsToRemove;
@@ -269,9 +275,6 @@ private :
     std::vector<int> m_agentIds;
 
     float m_frame;
-
-
-
 };
 
 size_t AtomsCrowdReader::g_firstPlugIndex = 0;
@@ -368,6 +371,9 @@ void AtomsCrowdReader::hashSource( const Gaffer::Context *context, MurmurHash &h
 
 ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context ) const
 {
+    // The compute sorce generate a point cloud. Every point contains
+    // the agentId, agentType, variation, lod, velocity, direction, orientation and scale ad prim var with "atoms:" prefix
+    // This data can be manipulated after this node and before the crowd generator
     ConstEngineDataPtr engineData = boost::static_pointer_cast<const EngineData>( enginePlug()->getValue() );
     if ( !engineData )
     {
@@ -377,7 +383,6 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
 
     double frame = engineData->frame();
     auto& atomsCache = engineData->cache();
-    //extract the ids, variation, lod, position, direction and velocity and bbox and store them on points
     auto& agentIds = engineData->agentIds();
     size_t numAgents = agentIds.size();
 
@@ -494,13 +499,6 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
                     positions[i] = pelvisMtx.translation();
                     rootMatrix[i] = Imath::M44f( pelvisMtx );
                     orientation[i] = Imath::extractQuat( pelvisMtx );
-                    /*
-                    Imath::Eulerd euler;
-                    euler.extract(Imath::extractQuat(pelvisMtx));
-                    orientation[i].x = euler.x * 180.0 / M_PI;
-                    orientation[i].y = euler.y * 180.0 / M_PI;
-                    orientation[i].z = euler.z * 180.0 / M_PI;
-                     */
                 }
             }
             else
@@ -534,6 +532,7 @@ void AtomsCrowdReader::hashAttributes( const ScenePath &path, const Gaffer::Cont
 
 IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneNode::ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent ) const
 {
+    // The attribute output a single attribute atoms:agents containing the pose and metadata of every agents
     ConstEngineDataPtr engineData = boost::static_pointer_cast<const EngineData>( enginePlug()->getValue() );
 
     IECore::CompoundObjectPtr result = new IECore::CompoundObject;
@@ -587,9 +586,9 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             M44dVectorDataPtr matricesData = new M44dVectorData;
             M44dVectorDataPtr normalMatricesData = new M44dVectorData;
 
-            //get the root world matrix
+            // get the root world matrix
             auto rootMatrix = poser.getWorldMatrix( posePtr->get(), 0 );
-            //now for all the detached joint multiply transform in root local space
+            // now for all the detached joint multiply transform in root local space
             AtomsCore::Matrix rootInverseMatrix = rootMatrix.inverse();
             const std::vector<unsigned short>& detachedJoints = agentTypePtr->skeleton().detachedJoints();
             for ( unsigned int ii = 0; ii < agentTypePtr->skeleton().detachedJoints().size(); ii++ )
@@ -618,6 +617,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
             const std::vector<AtomsCore::Matrix>& bindPosesInv = bindPosesInvPtr->get();
 
+            // Store the matrices for the skinning
             for ( unsigned int j = 0; j < outMatrices.size(); j++ )
             {
                 AtomsCore::Matrix &jMtx = outMatrices[j];
@@ -632,6 +632,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             M44dDataPtr rootMatrixData = new M44dData( rootMatrix );
             agentCompound["rootMatrix"] = rootMatrixData;
 
+            // This is an hash of the agent pose in local space
             UInt64DataPtr hashData = new UInt64Data( posePtr->get().hash() );
             agentCompound["hash"] = hashData;
         }
@@ -652,11 +653,12 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
         agentsCompoundData[ std::to_string( agentId ) ] =  agentCompoundData;
     }
 
+    // Store the frame offset, this is used by the cloth reader to mantain the 2 caches in synch
     FloatDataPtr frameOffsetData = new FloatData;
     frameOffsetData->writable() = timeOffsetPlug()->getValue();
     agentsCompoundData[ "frameOffset" ] = frameOffsetData;
 
-    //members[ "atoms:agents" ] = agentsCompound;
+    // Store the cache data inside the AtomsObject blind data container to not inpact on the UI performance
     AtomsObjectPtr atomsObj = new AtomsObject(agentsCompound);
     members[ "atoms:agents" ] = atomsObj;
     return result;

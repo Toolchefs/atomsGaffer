@@ -177,12 +177,12 @@ void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::C
 
 void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const
 {
-	// The instanceChildNamesPlug is evaluated in a context in which
+	// The agentChildNamesPlug is evaluated in a context in which
 	// scene:path holds the parent path for a branch.
 	if( output == agentChildNamesPlug() )
 	{
 		// Here we compute and cache the child names for all of
-		// the /agents/<agentName> locations at once. We
+		// the /agents/<agentType>/<variation> locations at once. We
 		// could instead compute them one at a time in
 		// computeBranchChildNames() but that would require N
 		// passes over the input points, where N is the number
@@ -194,7 +194,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 			throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a PointsPrimitive Object." );
 		}
 
-
+		// Get the agentId variable that contains the agent cache id
         const auto agentId = crowd->variables.find( "atoms:agentId" );
         if( agentId == crowd->variables.end() )
         {
@@ -216,6 +216,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
         std::string variationDefault;
         std::string lodDefault;
 
+        // Extract the agent type from the prim var
 		const auto agentType = crowd->variables.find( "atoms:agentType" );
 		if( agentType == crowd->variables.end() )
 		{
@@ -235,6 +236,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
                 agentTypeDefault = agentTypesData->readable();
         }
 
+        // Extract the agent variation from the prim var
 		const auto agentVariation = crowd->variables.find( "atoms:variation" );
 		if( agentVariation == crowd->variables.end() )
 		{
@@ -254,7 +256,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
                 variationDefault = agentVariationData->readable();
         }
 
-
+        // Extract the agent lod from the prim var
 		const auto agentLod = crowd->variables.find( "atoms:lod" );
 		if( agentLod == crowd->variables.end() )
 		{
@@ -275,6 +277,8 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
         }
 
 
+		// Agent map continig per every agent type the list of variation used
+		// and for every variation the list of agent id
 		std::map<std::string, std::map<std::string, std::vector<int>>> agentVariationMap;
 
         for( size_t agId = 0; agId < agentIdVec.size(); ++agId )
@@ -302,6 +306,7 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 			agentVariationMap[agentTypeName][variationName].push_back( agentIdVec[agId] );
         }
 
+        // Convert the variaion map in compound data
         CompoundDataPtr result = new CompoundData;
         auto& resultData = result->writable();
         for( auto typeIt = agentVariationMap.begin(); typeIt != agentVariationMap.end(); ++typeIt )
@@ -347,7 +352,7 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 
 	else if( branchPath.size() == 4 )
 	{
-		// "/agents/<agentName>"
+		// "/agents/<agentType>/<variation>/<id>"
 		BranchCreator::hashBranchBound( parentPath, branchPath, context, h );
 
 		inPlug()->attributesPlug()->hash( h );
@@ -363,7 +368,7 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 	}
 	else
 	{
-		// "/agents/<agentName>/<id>/..."
+		// "/agents/<agentType>/<variation>/<id>/..."
         clothCachePlug()->objectPlug()->hash( h );
 		AgentScope instanceScope( context, branchPath );
 		variationsPlug()->boundPlug()->hash( h );
@@ -389,6 +394,9 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
 	}
 	else if ( branchPath.size() >= 4 )
     {
+        // "/agents/<agentType>/<variation>/<id>/..."
+
+        // If there is any cloth extract the bounding box
         Imath::Box3d agentClothBBox;
 		ConstCompoundObjectPtr crowd;
 		{
@@ -397,11 +405,16 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             agentClothBBox = agentClothBoudingBox( parentPath, branchPath );
 		}
 
+
+        // Extract the bound from the agent bound stored inside the atoms cache
+        // This bound is computed from the agent joints and not from the skinned mesh,
+        // so it's not 100% right
         if( !crowd )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
         }
 
+        // The atoms:agents contain the atoms cache, so extract the bounding box from it
         auto atomsData = crowd->member<const AtomsObject>( "atoms:agents" );
         if( !atomsData )
         {
@@ -414,12 +427,14 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchBound : No agents data found." );
         }
 
+        // Extract the current agent
         auto agentData = agentsData->member<const CompoundData>( branchPath[3].string() );
         if( !agentData )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchBound : No agent found." );
         }
 
+        // Extract the agent root matrix
         Imath::M44d rootInvMatrix;
         auto poseData = agentData->member<const M44dData>( "rootMatrix" );
         if ( poseData ) {
@@ -427,6 +442,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             rootInvMatrix.invert();
         }
 
+        
         auto boxData = agentData->member<const Box3dData>( "boundingBox" );
         Imath::Box3f result;
         if ( boxData )
@@ -435,6 +451,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             Imath::Box3d agentBox = boxData->readable();
             if ( !agentClothBBox.isEmpty() )
             {
+                // The cloth bounding box is in world space. Convert in local space
                 agentBox.extendBy( agentClothBBox.min * rootInvMatrix );
                 agentBox.extendBy( agentClothBBox.max * rootInvMatrix );
             }
@@ -451,22 +468,22 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
 
 void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
+
 	if( branchPath.size() < 4 )
 	{
-		// "/" or "/agents" or "/agents/<agentName>"
+		// "/" or "/agents" or "/agents/<agentType> or "/agents/<agentType>/<variation>"
 		BranchCreator::hashBranchTransform( parentPath, branchPath, context, h );
 	}
 	else if( branchPath.size() == 4 )
 	{
-		// "/agents/<agentName>/<id>"
+		// "/agents/<agentType>/<variation>/<id>"
 		inPlug()->objectPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
 		h.append( branchPath[3] );
 	}
-
 	else
 	{
-		// "/agents/<agentName>/<id>/..."
+		// "/agents/<agentType>/<variation>/<id>/..."
 		AgentScope scope( context, branchPath );
 		variationsPlug()->transformPlug()->hash(h);
 		inPlug()->attributesPlug()->hash(h);
@@ -477,6 +494,7 @@ void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, cons
 
 Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+    // In atoms all the meshes have identity transformations, so here just return the default matrix
 	if( branchPath.size() < 4 )
 	{
 		// "/" or "/agents" or "/agents/<agentName>"
@@ -522,8 +540,10 @@ void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, con
             variationsPlug()->attributesPlug()->hash( h );
         }
 
+        // Some of the attributes are stored as prim var on the input point cloud
         inPlug()->objectPlug()->hash( h );
 
+        // The other attributes are stored inside the agent metadata map inside the cache
         auto agentData = agentCacheData(branchPath);
         auto metadataData = agentData->member<const CompoundData>( "metadata" );
         auto& metadataMap = metadataData->readable();
@@ -565,6 +585,7 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 		CompoundObjectPtr baseAttributes = new CompoundObject;
         auto& objMap = baseAttributes->members();
 
+        // Get the agent metadata and convert them in gaffer attributes
         auto agentData = agentCacheData(branchPath);
         auto metadataData = agentData->member<const CompoundData>( "metadata" );
 
@@ -572,8 +593,23 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
         for (auto memberIt = metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt)
         {
             std::string variableName = "user:atoms:" + memberIt->first.string();
+            // Atoms store all the data in double, while gaffer use floats, so convert them
             switch ( memberIt->second->typeId() )
             {
+                case IECore::TypeId::DoubleDataTypeId:
+                {
+                    FloatDataPtr fData = new FloatData;
+                    fData->writable() = runTimeCast<const DoubleData>( memberIt->second )->readable();
+                    objMap[variableName] = fData;
+                    break;
+                }
+                case IECore::TypeId ::V2dDataTypeId:
+                {
+                    V2fDataPtr fData = new V2fData;
+                    fData->writable() = Imath::V2f( runTimeCast<const V2dData>( memberIt->second )->readable() );
+                    objMap[variableName] = fData;
+                    break;
+                }
                 case IECore::TypeId ::V3dDataTypeId:
                 {
                     V3fDataPtr fData = new V3fData;
@@ -581,10 +617,17 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
                     objMap[variableName] = fData;
                     break;
                 }
-                case IECore::TypeId::DoubleDataTypeId:
+                case IECore::TypeId ::QuatdDataTypeId:
                 {
-                    FloatDataPtr fData = new FloatData;
-                    fData->writable() = runTimeCast<const DoubleData>( memberIt->second )->readable();
+                    QuatfDataPtr fData = new QuatfData;
+                    fData->writable() = Imath::Quatf( runTimeCast<const QuatdData>( memberIt->second )->readable() );
+                    objMap[variableName] = fData;
+                    break;
+                }
+                case IECore::TypeId ::M44dDataTypeId:
+                {
+                    M44fDataPtr fData = new M44fData;
+                    fData->writable() = Imath::M44f( runTimeCast<const M44dData>( memberIt->second )->readable() );
                     objMap[variableName] = fData;
                     break;
                 }
@@ -595,133 +638,136 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
             }
         }
 
+
+        // Now extract the agent metadata saved on the point cloud prim var
+        // Convert only the prim vars that has "atoms:" as prefix
+        int currentAgentIndex = std::atoi( branchPath[3].string().c_str() );
+
+        int agentIdPointIndex = -1;
+        ScenePlug::PathScope scope( context, parentPath );
+        auto points = runTimeCast<const PointsPrimitive>( inPlug()->objectPlug()->getValue() );
+
+        if ( !points )
         {
-            int currentAgentIndex = std::atoi( branchPath[3].string().c_str() );
+            return baseAttributes;
+        }
 
-            int agentIdPointIndex = -1;
-            ScenePlug::PathScope scope( context, parentPath );
-            auto points = runTimeCast<const PointsPrimitive>( inPlug()->objectPlug()->getValue() );
+        const auto agentId = points->variables.find( "atoms:agentId" );
+        if ( agentId == points->variables.end() )
+        {
+            throw InvalidArgumentException(
+                    "AtomsCrowdGenerator : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+        }
 
-            if ( !points )
+        auto agentIdData = runTimeCast<const IntVectorData>( agentId->second.data );
+        if ( !agentIdData ) {
+            throw InvalidArgumentException(
+                    "AtomsCrowdGenerator : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+        }
+
+        // Need to find with point has the data of the current agent
+        std::vector<int> agentIdVec = agentIdData->readable();
+        for ( size_t i = 0; i < agentIdVec.size(); ++i )
+        {
+            if ( agentIdVec[i] == currentAgentIndex )
             {
-                return baseAttributes;
+                agentIdPointIndex = i;
+                break;
+            }
+        }
+
+        for ( auto primIt = points->variables.cbegin(); primIt != points->variables.cend(); ++primIt )
+        {
+            size_t atomsIndex = primIt->first.find("atoms:");
+            if ( atomsIndex != 0 ) {
+                continue;
             }
 
-            const auto agentId = points->variables.find( "atoms:agentId" );
-            if ( agentId == points->variables.end() )
-            {
-                throw InvalidArgumentException(
-                        "AtomsCrowdGenerator : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
-            }
+            // All the data are trasfered to the renderer, so add "user:" as prefix
+            std::string variableName = "user:" + primIt->first;
 
-            auto agentIdData = runTimeCast<const IntVectorData>( agentId->second.data );
-            if ( !agentIdData ) {
-                throw InvalidArgumentException(
-                        "AtomsCrowdGenerator : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
-            }
-            std::vector<int> agentIdVec = agentIdData->readable();
-
-            for ( size_t i = 0; i < agentIdVec.size(); ++i )
+            switch( primIt->second.data->typeId() )
             {
-                if ( agentIdVec[i] == currentAgentIndex )
+                case IECore::TypeId::BoolVectorDataTypeId:
                 {
-                    agentIdPointIndex = i;
+                    auto data = runTimeCast<const BoolVectorData>( primIt->second.data );
+                    BoolDataPtr outData = new BoolData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
                     break;
                 }
-            }
 
-            for ( auto primIt = points->variables.cbegin(); primIt != points->variables.cend(); ++primIt )
-            {
-                size_t atomsIndex = primIt->first.find("atoms:");
-                if ( atomsIndex != 0 ) {
-                    continue;
+                case IECore::TypeId::IntVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const IntVectorData>( primIt->second.data );
+                    IntDataPtr outData = new IntData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
                 }
 
-                std::string variableName = "user:" + primIt->first;
-
-                switch( primIt->second.data->typeId() )
+                case IECore::TypeId::FloatVectorDataTypeId:
                 {
-                    case IECore::TypeId::BoolVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const BoolVectorData>( primIt->second.data );
-                        BoolDataPtr outData = new BoolData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                    auto data = runTimeCast<const FloatVectorData>( primIt->second.data );
+                    FloatDataPtr outData = new FloatData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::IntVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const IntVectorData>( primIt->second.data );
-                        IntDataPtr outData = new IntData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                case IECore::TypeId::StringVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const StringVectorData>( primIt->second.data );
+                    StringDataPtr outData = new StringData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::FloatVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const FloatVectorData>( primIt->second.data );
-                        FloatDataPtr outData = new FloatData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                case IECore::TypeId::V2fVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const V2fVectorData>( primIt->second.data );
+                    V2fDataPtr outData = new V2fData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::StringVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const StringVectorData>( primIt->second.data );
-                        StringDataPtr outData = new StringData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                case IECore::TypeId::V3fVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const V3fVectorData>( primIt->second.data );
+                    V3fDataPtr outData = new V3fData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::V2fVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const V2fVectorData>( primIt->second.data );
-                        V2fDataPtr outData = new V2fData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                case IECore::TypeId::M44fVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const M44fVectorData>( primIt->second.data );
+                    M44fDataPtr outData = new M44fData();
+                    outData->writable() = data->readable()[agentIdPointIndex];
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::V3fVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const V3fVectorData>( primIt->second.data );
-                        V3fDataPtr outData = new V3fData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
+                case IECore::TypeId::QuatfVectorDataTypeId:
+                {
+                    auto data = runTimeCast<const QuatfVectorData>( primIt->second.data );
+                    V3fDataPtr outData = new V3fData();
+                    auto quat = data->readable()[agentIdPointIndex];
+                    Imath::Eulerf euler;
+                    euler.extract(quat);
+                    outData->writable() = Imath::V3f(euler.x * 180.0 / M_PI, euler.y * 180.0 / M_PI, euler.z * 180.0 / M_PI);
+                    objMap[variableName] = outData;
+                    break;
+                }
 
-                    case IECore::TypeId::M44fVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const M44fVectorData>( primIt->second.data );
-                        M44fDataPtr outData = new M44fData();
-                        outData->writable() = data->readable()[agentIdPointIndex];
-                        objMap[variableName] = outData;
-                        break;
-                    }
-
-                    case IECore::TypeId::QuatfVectorDataTypeId:
-                    {
-                        auto data = runTimeCast<const QuatfVectorData>( primIt->second.data );
-                        V3fDataPtr outData = new V3fData();
-                        auto quat = data->readable()[agentIdPointIndex];
-                        Imath::Eulerf euler;
-                        euler.extract(quat);
-                        outData->writable() = Imath::V3f(euler.x * 180.0 / M_PI, euler.y * 180.0 / M_PI, euler.z * 180.0 / M_PI);
-                        objMap[variableName] = outData;
-                        break;
-                    }
-
-                    default:
-                    {
-                        IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "Unable to set " + primIt->first +
-                        " prim var of type: " +  primIt->second.data->typeName() );
-                        break;
-                    }
+                default:
+                {
+                    IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "Unable to set " + primIt->first +
+                    " prim var of type: " +  primIt->second.data->typeName() );
+                    break;
                 }
             }
         }
@@ -733,6 +779,7 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 		// "/agents/<agentName>/<id>/...
 		AgentScope scope( context, branchPath );
         CompoundObjectPtr outAttributes = variationsPlug()->attributesPlug()->getValue()->copy();
+        // Remove the skin weights data
         outAttributes->members().erase("jointIndexCount");
         outAttributes->members().erase("jointIndices");
         outAttributes->members().erase("jointWeights");
@@ -744,12 +791,12 @@ void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const S
 {
 	if( branchPath.size() <= 4 )
 	{
-		// "/" or "/agents" or "/agents/<agentName>"
+		// "/" or "/agents" or "/agents/<agentType>" or "/agents/<agentType>/<variation> or "/agents/<agentType>/<variation>/<id>"
 		h = outPlug()->objectPlug()->defaultValue()->Object::hash();
 	}
 	else
 	{
-		// "/agents/<agentName>/<id>/...
+		// "/agents/<agentType>/<variation>/<id>/...
         clothCachePlug()->objectPlug()->hash( h );
         AgentScope instanceScope( context, branchPath );
         variationsPlug()->objectPlug()->hash( h );
@@ -796,6 +843,10 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         throw InvalidArgumentException(
                 "AtomsAttributes : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
     }
+
+
+    // Get the point id that contain the agent data
+    // We need this only to get blend shapes weights information
     std::vector<int> agentIdVec = agentIdData->readable();
 
     for ( size_t i = 0; i < agentIdVec.size(); ++i )
@@ -817,10 +868,11 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         }
     }
 
+    // Extract cloth data
     auto cloth = agentClothMeshData( parentPath, branchPath );
     Imath::M44f rootMatrix = agentRootMatrix( parentPath, branchPath, context );
 
-    // "/agents/<agentName>/<id>/...
+    // "/agents/<agentType>/<variation>/<id>/...
     AgentScope scope( context, branchPath );
     auto meshPrim = runTimeCast<const MeshPrimitive>( variationsPlug()->objectPlug()->getValue() );
     auto meshAttributes = runTimeCast<const CompoundObject>( variationsPlug()->attributesPlug()->getValue() );
@@ -831,6 +883,8 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 
     auto agentData = agentCacheData(branchPath);
     auto metadataData = agentData->member<const CompoundData>( "metadata" );
+
+    // Extract the pose matricies. Every matrix must be worldBindPoseInverseMatrix * worldMatrix * rootMatrixInverse
     auto poseData = agentData->member<const M44dVectorData>( "poseWorldMatrices" );
     if ( !poseData )
     {
@@ -864,6 +918,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 
     if ( cloth )
     {
+        // Check the cloth stack order
         std::string stackOrder = "last";
         auto& clothData = cloth->readable();
         auto clothIt = clothData.find( "stackOrder" );
@@ -876,11 +931,14 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
             }
         }
 
+        // If the stack order is "first" then it contains transformation in T pose,
+        // so the root matrix should be null
         if ( stackOrder == "first" )
         {
             rootMatrix = Imath::M44f();
         }
 
+        // Apply the cloth deformation
         if ( !applyClothDeformer( branchPath, result, cloth, rootMatrix ) )
         {
             return variationsPlug()->objectPlug()->getValue();
@@ -888,12 +946,15 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 
         if ( stackOrder == "first" )
         {
+            // It's a first stack order mesh, so apply the skinning
             applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices );
         }
     }
     else
     {
+        // Apply blend shapes
         applyBlendShapesDeformer( branchPath, result, metadataData, pointVariablesData, agentIdPointIndex );
+        // Apply skinning
         applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices );
     }
     return result;
@@ -916,7 +977,7 @@ void AtomsCrowdGenerator::hashBranchChildNames( const ScenePath &parentPath, con
 	}
 	else if( branchPath.size() <= 3 )
 	{
-		// "/agents/<agentName>"
+		// "/agents/<agentType>" or "/agents/<agentType>/<variation>"
 		BranchCreator::hashBranchChildNames( parentPath, branchPath, context, h );
 		agentChildNamesHash( parentPath, context, h );
 		h.append( branchPath.back() );
@@ -978,6 +1039,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 	}
     else if( branchPath.size() == 3 )
     {
+        // "/agents/<agentType>/variation"
         IECore::ConstCompoundDataPtr children = agentChildNames( parentPath, context );
         auto variationsData = children->member<CompoundData>( branchPath[1] );
         InternedStringVectorDataPtr result = new InternedStringVectorData();
@@ -1130,7 +1192,6 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentCacheData(const ScenePath &branch
         throw InvalidArgumentException( "AtomsCrowdGenerator :  No agents data found." );
     }
 
-
     auto agentsData = atomsData->blindData();
     if( !agentsData )
     {
@@ -1258,82 +1319,86 @@ void AtomsCrowdGenerator::applySkinDeformer(
         return;
 
     auto pData = runTimeCast<V3fVectorData>( pVarIt->second.data );
-    if ( pData )
-    {
-        auto &pointsData = pData->writable();
-
-        if ( jointIndexCountVec.size() != pointsData.size() )
-        {
-            throw InvalidArgumentException( "AtomsAttributes : " + branchPath[3].string() + "Invalid jointIndexCount data of length " +
-                                            std::to_string( pointsData.size() ) + ", expected " + std::to_string( pointsData.size() ) +
-                                            ". ALl points must be skinned, please check your setup scene" );
-        }
-
-        for ( size_t vId = 0; vId < jointIndexCountVec.size(); ++vId )
-        {
-            offsetData[vId] = counter;
-            Imath::V4d newP, currentPoint;
-            Imath::V3f& inPoint = pointsData[vId];
-            newP.x = 0.0;
-            newP.y = 0.0;
-            newP.z = 0.0;
-            newP.w = 1.0;
-
-            currentPoint.x = inPoint.x;
-            currentPoint.y = inPoint.y;
-            currentPoint.z = inPoint.z;
-            currentPoint.w = 1.0;
-
-            for ( size_t jId = 0; jId < jointIndexCountVec[vId]; ++jId, ++counter )
-            {
-                int jointId = jointIndicesVec[counter];
-                newP += currentPoint * jointWeightsVec[counter] * worldMatrices[jointId];
-            }
-
-            inPoint.x = newP.x;
-            inPoint.y = newP.y;
-            inPoint.z = newP.z;
-        }
-    }
-    else
+    if ( !pData )
     {
         IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "No points found" );
+        return;
     }
 
-    auto nVarIt = result->variables.find( "N" );
-    if ( nVarIt != result->variables.end() )
+    auto &pointsData = pData->writable();
+
+    if ( jointIndexCountVec.size() != pointsData.size() )
     {
-        auto nData = runTimeCast<V3fVectorData>( nVarIt->second.data );
-        if (nData) {
-            auto &normals = nData->writable();
-            for (size_t vtxId = 0; vtxId < vertexIds.size(); ++vtxId) {
-                int pointId = vertexIds[vtxId];
-                size_t offset = offsetData[pointId];
+        throw InvalidArgumentException( "AtomsAttributes : " + branchPath[3].string() + "Invalid jointIndexCount data of length " +
+                                        std::to_string( pointsData.size() ) + ", expected " + std::to_string( pointsData.size() ) +
+                                        ". ALl points must be skinned, please check your setup scene" );
+    }
 
-                Imath::V4d newP, currentPoint;
-                Imath::V3f &inNormal = normals[vtxId];
+    Imath::V4d newP, currentPoint;
+    for ( size_t vId = 0; vId < jointIndexCountVec.size(); ++vId )
+    {
+        offsetData[vId] = counter;
+        Imath::V3f& inPoint = pointsData[vId];
+        newP.x = 0.0;
+        newP.y = 0.0;
+        newP.z = 0.0;
+        newP.w = 1.0;
 
-                newP.x = 0.0;
-                newP.y = 0.0;
-                newP.z = 0.0;
-                newP.w = 0.0;
+        currentPoint.x = inPoint.x;
+        currentPoint.y = inPoint.y;
+        currentPoint.z = inPoint.z;
+        currentPoint.w = 1.0;
 
-                currentPoint.x = inNormal.x;
-                currentPoint.y = inNormal.y;
-                currentPoint.z = inNormal.z;
-                currentPoint.w = 0.0;
-
-                for (size_t jId = 0; jId < jointIndexCountVec[pointId]; ++jId) {
-                    int jointId = jointIndicesVec[offset];
-                    newP += currentPoint * jointWeightsVec[offset] * worldMatrices[jointId];
-                }
-
-                inNormal.x = newP.x;
-                inNormal.y = newP.y;
-                inNormal.z = newP.z;
-                inNormal.normalize();
-            }
+        for ( size_t jId = 0; jId < jointIndexCountVec[vId]; ++jId, ++counter )
+        {
+            int jointId = jointIndicesVec[counter];
+            newP += currentPoint * jointWeightsVec[counter] * worldMatrices[jointId];
         }
+
+        inPoint.x = newP.x;
+        inPoint.y = newP.y;
+        inPoint.z = newP.z;
+    }
+
+
+    auto nVarIt = result->variables.find( "N" );
+    if ( nVarIt == result->variables.end() ) {
+        return;
+    }
+
+    auto nData = runTimeCast<V3fVectorData>( nVarIt->second.data );
+    if ( !nData )
+    {
+        return;
+    }
+
+    auto &normals = nData->writable();
+    for ( size_t vtxId = 0; vtxId < vertexIds.size(); ++vtxId )
+    {
+        int pointId = vertexIds[vtxId];
+        size_t offset = offsetData[pointId];
+
+        Imath::V3f &inNormal = normals[vtxId];
+
+        newP.x = 0.0;
+        newP.y = 0.0;
+        newP.z = 0.0;
+        newP.w = 0.0;
+
+        currentPoint.x = inNormal.x;
+        currentPoint.y = inNormal.y;
+        currentPoint.z = inNormal.z;
+        currentPoint.w = 0.0;
+
+        for (size_t jId = 0; jId < jointIndexCountVec[pointId]; ++jId) {
+            int jointId = jointIndicesVec[offset];
+            newP += currentPoint * jointWeightsVec[offset] * worldMatrices[jointId];
+        }
+
+        inNormal.x = newP.x;
+        inNormal.y = newP.y;
+        inNormal.z = newP.z;
+        inNormal.normalize();
     }
 }
 
@@ -1409,7 +1474,6 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
         blendPoints.push_back(&blendPointsVec);
         blendWeights.push_back(weight);
     }
-
 
 
     Imath::V3f currentPoint;
@@ -1488,6 +1552,7 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
             }
         }
     }
+
     // remove blend shape data
     result->variables.erase("blendShapeCount");
     for (int blendId = 0; blendId < numBlendShapes; ++blendId)
@@ -1589,7 +1654,6 @@ bool AtomsCrowdGenerator::applyClothDeformer(
         return true;
     }
 
-
     auto nData = runTimeCast<V3fVectorData>( nVarIt->second.data );
     if ( !nData )
     {
@@ -1611,6 +1675,7 @@ bool AtomsCrowdGenerator::applyClothDeformer(
 
     auto &outputN = nData->writable();
     auto &inputN = nClothData->readable();
+    // Check if the normals are as Vertex or FaceVarying interpolation
     if ( inputN.size() == pData->writable().size() )
     {
         for (size_t vId = 0; vId < vertexIds.size(); ++vId) {

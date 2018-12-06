@@ -45,5 +45,7 @@ install( DIRECTORY startup DESTINATION . FILES_MATCHING PATTERN "*.py" )
 install( FILES ${ATOMS_ICONS_PATH}/logo_new.png DESTINATION graphics RENAME atoms_logo.png )
 
 # build the examples
-file( GLOB AtomsGafferExamples examples/scripts/*.gfr )
-install( FILES ${AtomsGafferExamples} DESTINATION examples/scripts )
+file( GLOB AtomsGafferExampleScripts examples/scripts/*.gfr )
+install( FILES ${AtomsGafferExampleScripts} DESTINATION examples/scripts )
+install( DIRECTORY examples/assets DESTINATION examples )
+

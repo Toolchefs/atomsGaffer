@@ -36,11 +36,11 @@
 
 #include "AtomsGaffer/AtomsCrowdReader.h"
 #include "AtomsGaffer/AtomsMetadataTranslator.h"
-#include "AtomsGaffer/AtomsObject.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
 #include "IECore/NullObject.h"
+#include "IECore/BlindDataHolder.h"
 
 #include "AtomsUtils/PathSolver.h"
 #include "AtomsUtils/Utils.h"
@@ -694,8 +694,8 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
     frameOffsetData->writable() = timeOffsetPlug()->getValue();
     agentsCompoundData[ "frameOffset" ] = frameOffsetData;
 
-    // Store the cache data inside the AtomsObject blind data container to not inpact on the UI performance
-    AtomsObjectPtr atomsObj = new AtomsObject(agentsCompound);
+    // Store the cache data inside a blind data container to not inpact on the UI performance
+    BlindDataHolderPtr atomsObj = new BlindDataHolder(agentsCompound);
     members[ "atoms:agents" ] = atomsObj;
     return result;
 }

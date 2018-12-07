@@ -35,11 +35,11 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "AtomsGaffer/AtomsMetadata.h"
-#include "AtomsGaffer/AtomsObject.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
 #include "IECore/TypeIds.h"
+#include "IECore/BlindDataHolder.h"
 
 #include "AtomsCore/Metadata/MetadataTypeIds.h"
 #include <AtomsCore/Metadata/Metadata.h>
@@ -260,7 +260,7 @@ void AtomsMetadata::setMetadataOnPoints(
                 int agentId = agentIdVec[i];
 
 
-                auto atomsData = attributes->member<const AtomsObject>( "atoms:agents" );
+                auto atomsData = attributes->member<const BlindDataHolder>( "atoms:agents" );
                 if( !atomsData )
                 {
                     throw InvalidArgumentException( "AtomsAttributes : No agents data found." );

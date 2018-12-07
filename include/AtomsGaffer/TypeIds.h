@@ -49,9 +49,8 @@ enum class TypeId
 	AtomsVariationReaderTypeId = 120002,
 	AtomsCrowdGeneratorTypeId = 120003,
 	AtomsMetadataTypeId = 120004,
-	AtomsObjectTypeId = 120005,
+    AtomsAttributesTypeId = 120005,
 	AtomsCrowdClothReaderTypeId = 120006,
-	AtomsAttributesTypeId = 120007,
 
 	LastTypeId = 120499,
 };

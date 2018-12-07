@@ -36,6 +36,8 @@
 
 #include "boost/python.hpp"
 
+#include "IECorePython/RunTimeTypedBinding.h"
+
 #include "AtomsGaffer/AtomsCrowdReader.h"
 #include "AtomsGaffer/AtomsVariationReader.h"
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
@@ -80,6 +82,7 @@ public:
 
 	}
 };
+
 
 BOOST_PYTHON_MODULE( _AtomsGaffer )
 {

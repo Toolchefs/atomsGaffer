@@ -35,11 +35,11 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "AtomsGaffer/AtomsCrowdClothReader.h"
-#include "AtomsGaffer/AtomsObject.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
 #include "IECore/NullObject.h"
+#include "IECore/BlindDataHolder.h"
 
 #include "AtomsUtils/PathSolver.h"
 #include "AtomsUtils/Utils.h"
@@ -229,7 +229,7 @@ ConstObjectPtr AtomsCrowdClothReader::computeObject( const ScenePath &path, cons
         clothData[ agentIdStr ] = agentCompound;
     }
 
-    AtomsObjectPtr result = new AtomsObject( clothCompound );
+    BlindDataHolderPtr result = new BlindDataHolder( clothCompound );
     return result;
 }
 

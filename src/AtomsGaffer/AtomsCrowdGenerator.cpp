@@ -36,7 +36,6 @@
 
 #include <AtomsUtils/Logger.h>
 #include "AtomsGaffer/AtomsCrowdGenerator.h"
-#include "AtomsGaffer/AtomsObject.h"
 
 #include "Atoms/GlobalNames.h"
 
@@ -44,6 +43,7 @@
 #include "IECoreScene/MeshPrimitive.h"
 
 #include "IECore/NullObject.h"
+#include "IECore/BlindDataHolder.h"
 
 #include "ImathEuler.h"
 
@@ -450,7 +450,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         }
 
         // The atoms:agents contain the atoms cache, so extract the bounding box from it
-        auto atomsData = crowd->member<const AtomsObject>( "atoms:agents" );
+        auto atomsData = crowd->member<const BlindDataHolder>( "atoms:agents" );
         if( !atomsData )
         {
             throw InvalidArgumentException( "AtomsCrowdGenerator :  computeBranchBound : No agents data found." );
@@ -1221,7 +1221,7 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentCacheData(const ScenePath &branch
         throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
     }
 
-    auto atomsData = crowd->member<const AtomsObject>( "atoms:agents" );
+    auto atomsData = crowd->member<const BlindDataHolder>( "atoms:agents" );
     if( !atomsData )
     {
         throw InvalidArgumentException( "AtomsCrowdGenerator :  No agents data found." );
@@ -1245,7 +1245,7 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentCacheData(const ScenePath &branch
 ConstCompoundDataPtr AtomsCrowdGenerator::agentClothMeshData( const ScenePath &parentPath, const ScenePath &branchPath ) const
 {
     ConstCompoundDataPtr result;
-    auto cloth = runTimeCast<const AtomsObject>( clothCachePlug()->objectPlug()->getValue() );
+    auto cloth = runTimeCast<const BlindDataHolder>( clothCachePlug()->objectPlug()->getValue() );
     if ( !cloth )
     {
         return result;
@@ -1287,7 +1287,7 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentClothMeshData( const ScenePath &p
 Imath::Box3d AtomsCrowdGenerator::agentClothBoudingBox( const ScenePath &parentPath, const ScenePath &branchPath ) const
 {
     Imath::Box3d result;
-    auto cloth = runTimeCast<const AtomsObject>( clothCachePlug()->objectPlug()->getValue() );
+    auto cloth = runTimeCast<const BlindDataHolder>( clothCachePlug()->objectPlug()->getValue() );
     if ( !cloth )
     {
         return result;
@@ -1614,7 +1614,7 @@ Imath::M44f AtomsCrowdGenerator::agentRootMatrix(
         throw InvalidArgumentException( "AtomsCrowdGenerator : Input crowd must be a Compound Object." );
     }
 
-    auto atomsData = crowd->member<const AtomsObject>( "atoms:agents" );
+    auto atomsData = crowd->member<const BlindDataHolder>( "atoms:agents" );
     if( !atomsData )
     {
         throw InvalidArgumentException( "AtomsCrowdGenerator :  computeBranchTransform : No agents data found." );

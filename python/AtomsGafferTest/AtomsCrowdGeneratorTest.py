@@ -45,6 +45,8 @@ import GafferSceneTest
 
 import AtomsGaffer
 
+from AtomsTestData import buildTestPoints, buildTestAttributes
+
 class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 
 	def testConstruct( self ) :

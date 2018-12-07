@@ -48,7 +48,6 @@
 #include "AtomsUtils/Utils.h"
 
 #include <algorithm>
-#include <AtomsUtils/Logger.h>
 
 
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsMetadata );
@@ -263,13 +262,13 @@ void AtomsMetadata::setMetadataOnPoints(
                 auto atomsData = attributes->member<const BlindDataHolder>( "atoms:agents" );
                 if( !atomsData )
                 {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                    continue;
                 }
 
                 auto agentsData = atomsData->blindData();
                 if( !agentsData )
                 {
-                    throw InvalidArgumentException( "AtomsAttributes : No agents data found." );
+                    continue;
                 }
 
                 auto agentData = agentsData->member<const CompoundData>( std::to_string( agentId ) );
@@ -283,6 +282,7 @@ void AtomsMetadata::setMetadataOnPoints(
                 {
                     continue;
                 }
+
 
                 auto& atomsMetaData = metadataData->readable();
                 auto atomsMetaIt = atomsMetaData.find( metadataName );
@@ -345,13 +345,13 @@ IECore::ConstObjectPtr AtomsMetadata::computeObject( const ScenePath &path, cons
     const auto agentId = crowd->variables.find( "atoms:agentId" );
     if( agentId == crowd->variables.end() )
     {
-        throw InvalidArgumentException( "AtomsAttributes : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+        throw InvalidArgumentException( "AtomsMetadata : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
     }
 
     auto agentIdData = runTimeCast<const IntVectorData>( agentId->second.data );
     if (!agentIdData)
     {
-        throw InvalidArgumentException( "AtomsAttributes : Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
+        throw InvalidArgumentException( "AtomsMetadata: Input must be a PointsPrimitive containing an \"atoms:agentId\" vertex variable" );
     }
 
     std::vector<int> agentIdVec = agentIdData->readable();

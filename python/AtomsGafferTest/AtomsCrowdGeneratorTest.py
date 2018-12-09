@@ -74,6 +74,11 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		node["in"].setInput( crowd_input["out"] )
 		node["variations"].setInput( variations["out"] )
 
+		cloth = AtomsGaffer.AtomsCrowdClothReader()
+		cloth["atomsClothFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cloth_cache/cloth_sim.clothcache" )
+		cloth["in"].setInput( crowd_input["out"] )
+		node["clothCache"].setInput( cloth["out"] )
+
 		names = node["out"].childNames( "/" )
 		self.assertEqual( len(names), 1 )
 		self.assertEqual( names[0], "crowd" )
@@ -115,6 +120,8 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "robot1_body" in names)
 		self.assertTrue( "robot1_arms" in names)
 		self.assertTrue( "robot1_legs" in names)
+		self.assertTrue( "pole" in names)
+		self.assertTrue( "flag" in names)
 
 		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertTrue( "robot2_body" in names)
@@ -162,6 +169,11 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		node["variations"].setInput( custom_attributes["out"] )
 		node["in"].setInput( crowd_input["out"] )
 
+		cloth = AtomsGaffer.AtomsCrowdClothReader()
+		cloth["atomsClothFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cloth_cache/cloth_sim.clothcache" )
+		cloth["in"].setInput( crowd_input["out"] )
+		node["clothCache"].setInput( cloth["out"] )
+
 		self.assertTrue( "atoms:agents" in node["out"].attributes( "/crowd" ) )
 		attributes = node["out"].attributes( "/crowd/agents/atomsRobot" )
 		self.assertTrue( "testAttribute" in attributes )
@@ -192,6 +204,23 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/robot1_body" )
 		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
 		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
+
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/pole" )
+		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
+		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
+
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/flag" )
+		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
+		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
 
 		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertTrue( "user:atoms:agentType" in attributes )
@@ -208,6 +237,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		attributes = node["out"].attributes( "/crowd/agents/atoms2Robot/RedRobot/5/Body/RobotBody" )
 		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
 		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
 
 		attributes = node["out"].attributes( "/crowd/agents/atoms2Robot/PurpleRobot/12" )
 		self.assertTrue( "user:atoms:agentType" in attributes )
@@ -221,6 +253,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		attributes = node["out"].attributes( "/crowd/agents/atoms2Robot/RedRobot/12/Body/RobotBody" )
 		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
 		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
 
 	def testCompute( self ) :
 		variations_data = buildVariationTest()
@@ -240,6 +275,11 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		node["parent"].setValue( "/crowd" )
 		node["in"].setInput( crowd_input["out"] )
 		node["variations"].setInput( variations["out"] )
+
+		cloth = AtomsGaffer.AtomsCrowdClothReader()
+		cloth["atomsClothFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cloth_cache/cloth_sim.clothcache" )
+		cloth["in"].setInput( crowd_input["out"] )
+		node["clothCache"].setInput( cloth["out"] )
 
 		obj = node["out"].object( "/crowd/agents" )
 		self.assertEqual( obj, IECore.NullObject() )
@@ -266,22 +306,59 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( obj, IECore.NullObject() )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_head" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 920 )
+		self.assertEqual( len(obj["N"].data), 3480 )
+		self.assertEqual( len(obj["uv"].data), 3480 )
+		self.assertEqual( len(obj["map1"].data), 3480 )
+		self.assertTrue( "blendShape_0_P" not in obj )
+		self.assertTrue( "blendShape_1_P" not in obj )
+		self.assertTrue( "blendShape_0_N" not in obj )
+		self.assertTrue( "blendShape_1_N" not in obj )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_body" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 635 )
+		self.assertEqual( len(obj["N"].data), 2356 )
+		self.assertEqual( len(obj["uv"].data), 2356 )
+		self.assertEqual( len(obj["map1"].data), 2356 )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_arms" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 960 )
+		self.assertEqual( len(obj["N"].data), 3424 )
+		self.assertEqual( len(obj["uv"].data), 3424 )
+		self.assertEqual( len(obj["map1"].data), 3424 )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_legs" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 904 )
+		self.assertEqual( len(obj["N"].data), 3312 )
+		self.assertEqual( len(obj["uv"].data), 3312 )
+		self.assertEqual( len(obj["map1"].data), 3312 )
+
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/pole" )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 1022 )
+		self.assertEqual( len(obj["N"].data), 4120 )
+		self.assertEqual( len(obj["uv"].data), 4120 )
+		self.assertEqual( len(obj["map1"].data), 4120 )
+
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/flag" )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 121 )
+		self.assertEqual( len(obj["N"].data), 400 )
+		self.assertEqual( len(obj["uv"].data), 400 )
+		self.assertEqual( len(obj["map1"].data), 400 )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertEqual( obj, IECore.NullObject() )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot2/1/robot2_body" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 16944 )
+		self.assertEqual( len(obj["N"].data), 16944 )
+		self.assertEqual( len(obj["uv"].data), 16944 )
 
 		obj = node["out"].object( "/crowd/agents/atoms2Robot/RedRobot/5" )
 		self.assertEqual( obj, IECore.NullObject() )
@@ -290,7 +367,10 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( obj, IECore.NullObject() )
 
 		obj = node["out"].object( "/crowd/agents/atoms2Robot/RedRobot/5/Body/RobotBody" )
-		self.assertNotEqual( obj, IECore.NullObject() )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 28149 )
+		self.assertEqual( len(obj["N"].data), 111930 )
+		self.assertEqual( len(obj["uv"].data), 111930 )
 
 		obj = node["out"].object( "/crowd/agents/atoms2Robot/PurpleRobot/12" )
 		self.assertEqual( obj, IECore.NullObject() )
@@ -300,6 +380,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 
 		obj = node["out"].object( "/crowd/agents/atoms2Robot/PurpleRobot/12/Body/RobotBody" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+		self.assertEqual( len(obj["P"].data), 28149 )
+		self.assertEqual( len(obj["N"].data), 111930 )
+		self.assertEqual( len(obj["uv"].data), 111930 )
 
 if __name__ == "__main__":
 	unittest.main()

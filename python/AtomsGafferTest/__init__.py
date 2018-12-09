@@ -36,6 +36,7 @@
 
 from AtomsCrowdReaderTest import AtomsCrowdReaderTest
 from AtomsVariationReaderTest import AtomsVariationReaderTest
+from AtomsCrowdClothReaderTest import AtomsCrowdClothReaderTest
 from AtomsCrowdGeneratorTest import AtomsCrowdGeneratorTest
 from AtomsAttributesTest import AtomsAttributesTest
 from AtomsMetadataTest import AtomsMetadataTest

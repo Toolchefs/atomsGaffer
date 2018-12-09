@@ -66,8 +66,8 @@ class AtomsVariationReader : public GafferScene::SceneNode
 
 		IE_CORE_DECLARERUNTIMETYPEDEXTENSION( AtomsGaffer::AtomsVariationReader, TypeId::AtomsVariationReaderTypeId, GafferScene::SceneNode );
 
-		Gaffer::StringPlug *atomsAgentFilePlug();
-		const Gaffer::StringPlug *atomsAgentFilePlug() const;
+		Gaffer::StringPlug *atomsVariationFilePlug();
+		const Gaffer::StringPlug *atomsVariationFilePlug() const;
 
 		Gaffer::IntPlug *refreshCountPlug();
 		const Gaffer::IntPlug *refreshCountPlug() const;

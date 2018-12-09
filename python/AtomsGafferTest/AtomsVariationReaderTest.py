@@ -45,16 +45,17 @@ import GafferSceneTest
 
 import AtomsGaffer
 
-class AtomsAgentReaderTest( GafferSceneTest.SceneTestCase ) :
+class AtomsVariationReaderTest( GafferSceneTest.SceneTestCase ) :
 
 	def testConstruct( self ) :
 
-		a = AtomsGaffer.AtomsAgentReader()
-		self.assertEqual( a.getName(), "AtomsAgentReader" )
+		a = AtomsGaffer.AtomsVariationReader()
+		self.assertEqual( a.getName(), "AtomsVariationReader" )
 
 	def testCompute( self ) :
 
-		raise RuntimeError, "Write tests for AtomsAgentReader"
+		variations = AtomsGaffer.AtomsVariationReader()
+		variations["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
 
 if __name__ == "__main__":
 	unittest.main()

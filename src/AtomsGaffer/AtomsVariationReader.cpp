@@ -305,10 +305,53 @@ public :
                         }
                         currentMap = objIt;
                     }
+
                 }
 
                 auto variationHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>( variationHierarchy );
                 agentTypeHierarchy->addEntry( variationName, variationHierarchyData, false );
+
+
+                for ( const auto& lodName: variationPtr->getLodNames() )
+                {
+                    auto lodPtr = variationPtr->getLodPtr( lodName );
+                    if ( !lodPtr )
+                        continue;
+
+                    AtomsPtr<AtomsCore::MapMetadata> lodHierarchy( new AtomsCore::MapMetadata );
+
+                    for( int cId = 0; cId < lodPtr->numCombinations(); ++cId ) {
+                        auto &combinationLod = lodPtr->getCombinationAtIndex(cId);
+
+                        auto geoPtr = agentTypePtr->getGeometryPtr( combinationLod.first );
+                        if (!geoPtr)
+                            continue;
+
+                        if ( agentTypeIt->second.find(
+                                geoPtr->getGeometryFile() + ":" + geoPtr->getGeometryFilter() ) ==
+                            agentTypeIt->second.end())
+                            continue;
+
+                        // Split the full path geo name to build the full hierarchy
+                        std::vector<std::string> lodObjectNames;
+                        AtomsUtils::splitString( combinationLod.first, '|', lodObjectNames );
+
+                        auto currentMap = lodHierarchy;
+                        for ( const auto &objName: lodObjectNames ) {
+                            auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
+                            if (!objIt) {
+                                AtomsCore::MapMetadata emptyData;
+                                currentMap->addEntry(objName, &emptyData);
+                                objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
+                            }
+                            currentMap = objIt;
+                        }
+                    }
+
+                    auto lodHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>( lodHierarchy );
+                    agentTypeHierarchy->addEntry( variationName + ":" + lodName, lodHierarchyData, false );
+                }
+
             }
 
             auto agentTypeHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>( agentTypeHierarchy );
@@ -442,19 +485,19 @@ AtomsVariationReader::AtomsVariationReader( const std::string &name )
 {
 	storeIndexOfNextChild( g_firstPlugIndex );
 
-	addChild( new StringPlug( "atomsAgentFile" ) );
+	addChild( new StringPlug( "atomsVariationFile" ) );
     addChild( new BoolPlug( "Pref" ) );
     addChild( new BoolPlug( "Nref" ) );
 	addChild( new IntPlug( "refreshCount" ) );
 	addChild( new ObjectPlug( "__engine", Plug::Out, NullObject::defaultNullObject() ) );
 }
 
-StringPlug* AtomsVariationReader::atomsAgentFilePlug()
+StringPlug* AtomsVariationReader::atomsVariationFilePlug()
 {
 	return getChild<StringPlug>( g_firstPlugIndex );
 }
 
-const StringPlug* AtomsVariationReader::atomsAgentFilePlug() const
+const StringPlug* AtomsVariationReader::atomsVariationFilePlug() const
 {
 	return getChild<StringPlug>( g_firstPlugIndex );
 }
@@ -501,7 +544,7 @@ const Gaffer::ObjectPlug *AtomsVariationReader::enginePlug() const
 
 void AtomsVariationReader::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
-	if( input == atomsAgentFilePlug() || input == refreshCountPlug() ||
+	if( input == atomsVariationFilePlug() || input == refreshCountPlug() ||
 	input == generateNrefPlug() || input == generatePrefPlug() )
 	{
 		outputs.push_back( enginePlug() );
@@ -525,7 +568,7 @@ void AtomsVariationReader::hashBound( const ScenePath &path, const Gaffer::Conte
 {
 	SceneNode::hashBound( path, context, parent, h );
 
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -584,7 +627,7 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
 void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashTransform( path, context, parent, h );
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -599,7 +642,7 @@ Imath::M44f AtomsVariationReader::computeTransform( const ScenePath &path, const
 void AtomsVariationReader::hashAttributes( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashAttributes( path, context, parent, h );
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -792,7 +835,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
 void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashObject( path, context, parent, h );
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
     generatePrefPlug()->hash( h );
     generateNrefPlug()->hash( h );
@@ -880,7 +923,7 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
 void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashChildNames( path, context, parent, h );
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 	h.append( &path.front(), path.size() );
 }
@@ -944,7 +987,7 @@ void AtomsVariationReader::hashSetNames( const Gaffer::Context *context, const S
 {
 	SceneNode::hashSetNames( context, parent, h );
 
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 }
 
@@ -985,7 +1028,7 @@ void AtomsVariationReader::hashSet( const IECore::InternedString &setName, const
 {
 	SceneNode::hashSet( setName, context, parent, h );
 
-	atomsAgentFilePlug()->hash( h );
+    atomsVariationFilePlug()->hash( h );
 	refreshCountPlug()->hash( h );
 	h.append( setName );
 }
@@ -1083,7 +1126,7 @@ void AtomsVariationReader::hash( const Gaffer::ValuePlug *output, const Gaffer::
 {
 	if( output == enginePlug() )
 	{
-		atomsAgentFilePlug()->hash( h );
+        atomsVariationFilePlug()->hash( h );
 		refreshCountPlug()->hash( h );
 	}
 
@@ -1108,7 +1151,7 @@ void AtomsVariationReader::compute( Gaffer::ValuePlug *output, const Gaffer::Con
 	// branch.
 	if (output == enginePlug()) {
 
-		static_cast<ObjectPlug *>( output )->setValue(new EngineData(atomsAgentFilePlug()->getValue()));
+		static_cast<ObjectPlug *>( output )->setValue(new EngineData(atomsVariationFilePlug()->getValue()));
 		return;
 	}
 

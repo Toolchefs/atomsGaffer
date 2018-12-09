@@ -44,7 +44,7 @@ def buildTestPoints():
     agent_id = [0, 1, 2, 3]
     agent_type = [ "atomsRobot", "atomsRobot", "atoms2Robot", "atoms2Robot" ]
     agent_variation = [ "Robot1", "Robot2", "RedRobot", "PurpleRobot" ]
-    agent_lod = [ "A", "B", "A", "B" ]
+    agent_lod = [ "", "B", "A", "" ]
     agent_velocity = [ imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 0, 0, 0 ), imath.V3f( 1, 0, 0 ) ]
     agent_direction = [ imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ) ]
     agent_scale = [ imath.V3f( 1, 1, 1 ), imath.V3f( 1, 1, 1 ), imath.V3f( 1, 1, 1 ), imath.V3f( 1, 1, 1 ) ]
@@ -74,49 +74,127 @@ def buildTestAttributes():
     attributes_map = {
         "0": {
             "agentType": IECore.StringData( "atomsRobot" ),
-            "boundingBox": IECore.Box3fData( imath.Box3f( imath.V3f(), imath.V3f() ) ),
+            "boundingBox": IECore.Box3dData( imath.Box3d( imath.V3d( -1.0 ), imath.V3d( 1.0 ) ) ),
             "metadata": {
                 "testData": IECore.IntData( 2 )
             },
             "hash": IECore.UInt64Data( 0 ),
-            "rootMatrix": IECore.M44fData( imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ),
-            "poseNormalWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
-            "poseWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
+            "rootMatrix": IECore.M44dData( imath.M44d().translate( imath.V3d( 0.0, 0.0, 0.0 ) ) ),
+            "poseNormalWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ] ),
+            "poseWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ] ),
         },
         "1": {
             "agentType": IECore.StringData( "atomsRobot" ),
-            "boundingBox": IECore.Box3fData( imath.Box3f( imath.V3f(), imath.V3f() ) ),
+            "boundingBox": IECore.Box3dData( imath.Box3d( imath.V3d( -1.0 ), imath.V3d( 1.0 ) ) ),
             "metadata": {
                 "testData": IECore.IntData( 2 )
             },
             "hash": IECore.UInt64Data( 0 ),
-            "rootMatrix": IECore.M44fData( imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ),
-            "poseNormalWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
-            "poseWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
+            "rootMatrix": IECore.M44dData( imath.M44d().translate( imath.V3d( 1.0, 0.0, 0.0 ) ) ),
+            "poseNormalWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ] ),
+            "poseWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ] ),
         },
         "2": {
             "agentType": IECore.StringData( "atomsRobot" ),
-            "boundingBox": IECore.Box3fData( imath.Box3f( imath.V3f(), imath.V3f() ) ),
+            "boundingBox": IECore.Box3dData( imath.Box3d( imath.V3d( -1.0 ), imath.V3d( 1.0 ) ) ),
             "metadata": {
                 "testData": IECore.IntData( 2 )
             },
             "hash": IECore.UInt64Data( 0 ),
-            "rootMatrix": IECore.M44fData( imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ),
-            "poseNormalWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
-            "poseWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
+            "rootMatrix": IECore.M44dData( imath.M44d().translate( imath.V3d( 2.0, 0.0, 0.0 ) ) ),
+            "poseNormalWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ]),
+            "poseWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ]),
         },
         "3": {
             "agentType": IECore.StringData( "atomsRobot" ),
-            "boundingBox": IECore.Box3fData( imath.Box3f( imath.V3f(), imath.V3f() ) ),
+            "boundingBox": IECore.Box3dData( imath.Box3d( imath.V3d( -1.0 ), imath.V3d( 1.0 ) ) ),
             "metadata": {
                 "testData": IECore.IntData( 2 )
             },
             "hash": IECore.UInt64Data( 0 ),
-            "rootMatrix": IECore.M44fData( imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ),
-            "poseNormalWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
-            "poseWorldMatrices": IECore.M44fVectorData( [ imath.M44f().translate( imath.V3f( 0.0, 0.0, 0.0 ) ) ]),
+            "rootMatrix": IECore.M44dData( imath.M44d().translate( imath.V3d( 3.0, 0.0, 0.0 ) ) ),
+            "poseNormalWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ]),
+            "poseWorldMatrices": IECore.M44dVectorData( [ imath.M44d() ]),
         },
         "frameOffset": IECore.FloatData( 0 ),
     }
 
     return { "atoms:agents": IECore.BlindDataHolder( attributes_map ) }
+
+def buildCrowdTest():
+    points = buildTestPoints()
+    attributes_map = buildTestAttributes()
+    return  IECore.CompoundObject( {
+            "bound" : IECore.Box3fData( imath.Box3f( imath.V3f( 0, 0, 0 ), imath.V3f( 1, 0, 1 ) ) ),
+            "attributes" : IECore.CompoundObject( ),
+            "children" : {
+                "crowd" : {
+                    "bound" : IECore.Box3fData( points.bound() ),
+                    "transform" : IECore.M44fData( imath.M44f() ),
+                    "object" : points,
+                    "attributes" : IECore.CompoundObject( attributes_map )
+                },
+            },
+        }, )
+
+def buildVariationTest():
+    mesh = IECoreScene.SpherePrimitive()
+    mesh = IECoreScene.MeshPrimitive.createBox( imath.Box3f( imath.V3f( -0.5 ), imath.V3f( 0.5 ) ) )
+
+    verticesPerFace = IECore.IntVectorData( [4, 4, 4, 4, 4, 4] )
+    vertexIds = IECore.IntVectorData( [ 0, 3, 2, 1, 2, 3, 7, 6, 0, 4, 7, 3, 1, 2, 6, 5, 4, 5, 6, 7, 0, 1, 5, 4 ] )
+    p = IECore.V3fVectorData( [imath.V3f( 0, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 1 ), imath.V3f( 0, 0, 1 ),
+                               imath.V3f( 0, 1, 0 ), imath.V3f( 1, 1, 0 ), imath.V3f( 1, 1, 1 ), imath.V3f( 0, 1, 1 ) ] )
+
+    n = IECore.V3fVectorData( [imath.V3f( 0, -1, 0 ), imath.V3f( 0, -1, 0 ), imath.V3f( 0, -1, 0 ), imath.V3f( 0, -1, 0 ),
+                               imath.V3f( 0, 0, 1 ), imath.V3f( 0, 0, 1 ), imath.V3f( 0, 0, 1 ), imath.V3f( 0, 0, 1 ),
+                               imath.V3f( -1, 0, 0 ), imath.V3f( -1, 0, 0 ), imath.V3f( -1, 0, 0 ), imath.V3f( -1, 0, 0 ),
+                               imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ), imath.V3f( 1, 0, 0 ),
+                               imath.V3f( 0, 1, 0 ), imath.V3f( 0, 1, 0 ), imath.V3f( 0, 1, 0 ), imath.V3f( 0, 1, 0 ),
+                               imath.V3f( 0, 0, -1 ), imath.V3f( 0, 0, -1 ), imath.V3f( 0, 0, -1 ), imath.V3f( 0, 0, -1 ),
+                               ] )
+
+    mesh2 = IECoreScene.MeshPrimitive( verticesPerFace, vertexIds, "linear", p )
+    mesh2["N"] = IECoreScene.PrimitiveVariable( IECoreScene.PrimitiveVariable.Interpolation.FaceVarying, n )
+
+    mesh_bbox = imath.Box3f( imath.V3f( 0.0 ), imath.V3f( 1.0 ) )
+    joint_indices_count = IECore.IntVectorData( [ 1, 1, 1, 1, 1, 1, 1, 1 ] )
+    joint_indices = IECore.IntVectorData( [ 0, 0, 0, 0, 0, 0, 0, 0 ] )
+    joint_weights = IECore.FloatVectorData( [ 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0 ] )
+
+    attributes_map = {
+
+        "jointIndexCount" : joint_indices_count,
+        "jointIndices" : joint_indices,
+        "jointWeights" : joint_weights,
+
+    }
+
+    variations = {
+        "attributes" : IECore.CompoundObject(),
+        "children" : {
+            "atoms2Robot" : {
+                "attributes" : IECore.CompoundObject(),
+                "children" : {
+                    "PurpleRobot":
+                    {
+                        "attributes" : IECore.CompoundObject(),
+                        "children" : {
+                            "Body" :
+                            {
+                                "attributes" : IECore.CompoundObject(),
+                                "children": {
+                                    "RobotBody": {
+                                        "object" : mesh,
+                                        "attributes" : IECore.CompoundObject(  )
+                                    },
+                                }
+                            }
+                        },
+                    },
+                }
+            },
+        }
+    }
+    return variations
+

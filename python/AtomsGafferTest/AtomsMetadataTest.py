@@ -45,7 +45,7 @@ import GafferSceneTest
 
 import AtomsGaffer
 
-from AtomsTestData import buildTestPoints, buildTestAttributes
+from AtomsTestData import buildCrowdTest
 
 class AtomsMetadataTest( GafferSceneTest.SceneTestCase ) :
 
@@ -55,26 +55,11 @@ class AtomsMetadataTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( a.getName(), "AtomsMetadata" )
 
 	def testCompute( self ) :
-		points = buildTestPoints()
-		attributes_map = buildTestAttributes()
-
-		points_input = GafferSceneTest.CompoundObjectSource()
-		points_input["in"].setValue(
-			IECore.CompoundObject( {
-				"bound" : IECore.Box3fData( imath.Box3f( imath.V3f( 0, 0, 0 ), imath.V3f( 1, 0, 1 ) ) ),
-				"children" : {
-					"crowd" : {
-						"bound" : IECore.Box3fData( points.bound() ),
-						"transform" : IECore.M44fData( imath.M44f() ),
-						"object" : points,
-						"attributes" : IECore.CompoundObject( attributes_map )
-					},
-				},
-			}, )
-		)
+		crowd_input = GafferSceneTest.CompoundObjectSource()
+		crowd_input["in"].setValue( buildCrowdTest() )
 
 		node = AtomsGaffer.AtomsMetadata()
-		node["in"].setInput( points_input["out"] )
+		node["in"].setInput( crowd_input["out"] )
 
 		node["metadata"].addMember( "tint", IECore.V3fData( imath.V3f( 1.0, 0.0, 0.0 ) ) )
 		node["metadata"].addMember( "variation", IECore.StringData( "Robot1" ) )
@@ -108,25 +93,11 @@ class AtomsMetadataTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( variation_data[3], "Robot1" )
 
 	def testFilterCompute( self ) :
-		points = buildTestPoints()
-		attributes_map = buildTestAttributes()
-		points_input = GafferSceneTest.CompoundObjectSource()
-		points_input["in"].setValue(
-			IECore.CompoundObject( {
-				"bound" : IECore.Box3fData( imath.Box3f( imath.V3f( 0, 0, 0 ), imath.V3f( 1, 0, 1 ) ) ),
-				"children" : {
-					"crowd" : {
-						"bound" : IECore.Box3fData( points.bound() ),
-						"transform" : IECore.M44fData( imath.M44f() ),
-						"object" : points,
-						"attributes" : IECore.CompoundObject( attributes_map ),
-					},
-				},
-			}, )
-		)
+		crowd_input = GafferSceneTest.CompoundObjectSource()
+		crowd_input["in"].setValue( buildCrowdTest() )
 
 		node = AtomsGaffer.AtomsMetadata()
-		node["in"].setInput( points_input["out"] )
+		node["in"].setInput( crowd_input["out"] )
 		node["agentIds"].setValue( "1-2")
 		node["metadata"].addMember( "tint", IECore.V3fData( imath.V3f( 1.0, 0.0, 0.0 ) ) )
 		node["metadata"].addMember( "variation", IECore.StringData( "Robot3" ) )

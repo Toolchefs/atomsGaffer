@@ -916,13 +916,14 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         return variationsPlug()->objectPlug()->getValue();
     }
 
-    auto agentData = agentCacheData(branchPath);
+    auto agentData = agentCacheData( branchPath );
     auto metadataData = agentData->member<const CompoundData>( "metadata" );
 
     // Extract the pose matricies. Every matrix must be worldBindPoseInverseMatrix * worldMatrix * rootMatrixInverse
     auto poseData = agentData->member<const M44dVectorData>( "poseWorldMatrices" );
     if ( !poseData )
     {
+
         IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "No poseWorldMatrices found" );
         return variationsPlug()->objectPlug()->getValue();
     }
@@ -933,7 +934,6 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "No poseNormalWorldMatrices found" );
         return variationsPlug()->objectPlug()->getValue();
     }
-
     auto& worldMatrices = poseData->readable();
     auto& worldNormalMatrices = poseNormalData->readable();
     if ( worldMatrices.empty() || worldNormalMatrices.empty() )
@@ -941,6 +941,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "Empty poseWorldMatrices or poseNormalWorldMatrices attribute" );
         return variationsPlug()->objectPlug()->getValue();
     }
+
 
     MeshPrimitivePtr result = meshPrim->copy();
 
@@ -992,6 +993,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         // Apply skinning
         applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices );
     }
+
     return result;
 }
 
@@ -1027,6 +1029,7 @@ void AtomsCrowdGenerator::hashBranchChildNames( const ScenePath &parentPath, con
 
 ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const
 {
+
 	if( branchPath.empty() )
 	{
 		// "/"
@@ -1037,7 +1040,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 		}
 		InternedStringVectorDataPtr result = new InternedStringVectorData();
 		result->writable().emplace_back( name );
-		return result;
+        return result;
 	}
 	else if( branchPath.size() == 1 )
 	{
@@ -1058,7 +1061,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 		// "/agents/<agentType>"
 		IECore::ConstCompoundDataPtr children = agentChildNames( parentPath, context );
 
-		auto variationsData = children->member<CompoundData>(branchPath.back());
+		auto variationsData = children->member<CompoundData>( branchPath.back() );
         InternedStringVectorDataPtr result = new InternedStringVectorData();
 
         auto& names = result->writable();
@@ -1078,7 +1081,7 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
         IECore::ConstCompoundDataPtr children = agentChildNames( parentPath, context );
         auto variationsData = children->member<CompoundData>( branchPath[1] );
         InternedStringVectorDataPtr result = new InternedStringVectorData();
-        if (variationsData)
+        if ( variationsData )
         {
             return variationsData->member<InternedStringVectorData>( branchPath.back() );
         }

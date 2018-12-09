@@ -55,7 +55,7 @@ Gaffer.Metadata.registerNode(
 
     plugs = {
 
-        "atomsAgentFile" : [
+        "atomsVariationFile" : [
 
             "description",
             """

@@ -1,0 +1,19 @@
+### ATOMS: red_material_ARN_MAT
+### exported: Thu Dec  6 15:20:02 2018
+### from:     Arnold 5.2.1.0 [7c7c9701] linux clang-5.0.0 oiio-1.7.17 osl-1.9.9 vdb-4.0.0 clm-1.0.3.513 rlm-12.4.2 2018/10/19 22:25:43
+### host app: MtoA 3.1.1 5d19efb6 (master) Maya 2018
+
+standard_surface
+{
+ name red_material_ARN_MAT
+ base_color red_material_ARN_FILE
+}
+
+image
+{
+ name red_material_ARN_FILE
+ filename "/opt/Toolchefs/AtomsGaffer/examples/assets/atomsRobot/preview/atoms2Robot/red_material_diff.jpg"
+ color_space ""
+ missing_texture_color 0 0 0 1
+}
+

@@ -1,3 +1,39 @@
+##########################################################################
+#
+#  Copyright (c) 2018, Toolchefs Ltd. All rights reserved.
+#
+#  Redistribution and use in source and binary forms, with or without
+#  modification, are permitted provided that the following conditions are
+#  met:
+#
+#      * Redistributions of source code must retain the above
+#        copyright notice, this list of conditions and the following
+#        disclaimer.
+#
+#      * Redistributions in binary form must reproduce the above
+#        copyright notice, this list of conditions and the following
+#        disclaimer in the documentation and/or other materials provided with
+#        the distribution.
+#
+#      * Neither the name of John Haddon nor the names of
+#        any other contributors to this software may be used to endorse or
+#        promote products derived from this software without specific prior
+#        written permission.
+#
+#  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS
+#  IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO,
+#  THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR
+#  PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT OWNER OR
+#  CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL,
+#  EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED TO,
+#  PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+#  PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+#  LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+#  NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+#  SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+##########################################################################
+
 import IECore
 
 import Gaffer
@@ -42,22 +78,20 @@ Gaffer.Metadata.registerNode(
 
         ],
 
-        "agents" : [
+        "variations" : [
 
             "description",
             """
-			The scene containing the agents to be applied to each vertex of
-			the crowd. Specify multiple agents by parenting them at the root
-			of the scene :
+			The scene containing the agent variation mesh to be applied to each agent skeleton of
+			the crowd. Specify multiple variation by parenting them at the right agent type:
 
-			- /agent0
-			- /agent1
-			- /agent2
+			- /soldier/soldierSword
+			- /soldier/soldierSwordShield
+			- /archer/defaultArcher
+			
+			Set up the lod using ':' after the variation name. Eg. /soldier/soldierSword:A
 
-			Be sure to order the agents to match the \"agentType\" data provided
-			on the input crowd points.
-
-			Note that the agents are not limited to being a
+			Note that the variations are not limited to being a
 			single object : they can each have arbitrary child
 			hierarchies.
 			""",
@@ -66,15 +100,23 @@ Gaffer.Metadata.registerNode(
 
         ],
 
-        "attributes" : [
+        "useInstances" : [
 
             "description",
             """
-			The names of per-vertex primitive variables to be turned into
-			per-agent attributes. Names should be separated by spaces and
-			can use Gaffer's standard wildcards.
-			""",
+            Turn on agent instancing. Agents with the same pose and metadata values are instanced.
+            """,
 
+        ],
+
+        "boundingBoxPadding" : [
+
+            "description",
+            """
+            Bounding box padding
+            """,
+            "layout:section", "Bounding Box",
+            "label", "Padding"
         ],
 
     },

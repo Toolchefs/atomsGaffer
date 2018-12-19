@@ -40,4 +40,5 @@ import AtomsCrowdReaderUI
 import AtomsVariationReaderUI
 import AtomsCrowdGeneratorUI
 import AtomsAttributesUI
+import AtomsMetadataUI
 import AtomsCrowdClothReaderUI

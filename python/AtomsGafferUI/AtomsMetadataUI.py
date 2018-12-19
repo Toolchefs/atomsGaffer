@@ -67,6 +67,15 @@ Gaffer.Metadata.registerNode(
             "label", "Agent Indices",
         ],
 
+        "invert" : [
+
+            "description",
+            """
+            Inverts the agentId list
+            """,
+
+        ],
+
         "metadata" : [
 
             "description",

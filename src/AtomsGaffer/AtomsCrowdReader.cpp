@@ -431,6 +431,10 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     IntVectorDataPtr agentCacheIdsData = new IntVectorData;
     agentCacheIdsData->writable() = agentIds;
 
+	StringVectorDataPtr agentCacheIdsStrData = new StringVectorData;
+	auto &agentCacheIdsStr = agentCacheIdsStrData->writable();
+	agentCacheIdsStr.resize( numAgents );
+
     StringVectorDataPtr agentTypesData = new StringVectorData;
     auto &agentTypes = agentTypesData->writable();
     agentTypes.resize( numAgents );
@@ -474,6 +478,10 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
         CompoundDataPtr agentCompoundData = new CompoundData;
         auto &agentCompound = agentCompoundData->writable();
         int agentId = agentIds[i];
+        // \todo: In order to use the agentId for cryptomattes we need a string attribute,
+        // but we don't currently have a way of changing attribute data type in Gaffer.
+        // This is just a hack until that functionality exists. Remove when possible.
+        agentCacheIdsStr[i] = std::to_string( agentId );
 
         // load in memory the agent type since the cache need this to interpolate the pose
         const std::string &agentTypeName = atomsCache.agentType( frame, agentId );
@@ -549,6 +557,7 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
     points->variables["atoms:variation"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentVariationData );
     points->variables["atoms:lod"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentLodData );
     points->variables["atoms:agentId"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsData );
+    points->variables["atoms:agentIdStr"] = PrimitiveVariable( PrimitiveVariable::Vertex, agentCacheIdsStrData );
     points->variables["atoms:velocity"] = PrimitiveVariable( PrimitiveVariable::Vertex, velocityData );
     points->variables["atoms:direction"] = PrimitiveVariable( PrimitiveVariable::Vertex, directionData );
     points->variables["atoms:scale"] = PrimitiveVariable( PrimitiveVariable::Vertex, scaleData );

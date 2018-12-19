@@ -119,6 +119,15 @@ Gaffer.Metadata.registerNode(
             "label", "Padding"
         ],
 
+		"clothCache" : [
+
+			"description",
+			"""
+			The scene containing the cloth cache metadata.
+			""",
+
+		],
+
     },
 
 )

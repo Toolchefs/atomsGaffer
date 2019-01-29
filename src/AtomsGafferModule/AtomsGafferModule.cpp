@@ -91,10 +91,21 @@ BOOST_PYTHON_MODULE( _AtomsGaffer )
 	AtomsUtils::Logger::instance().setLogType(mayaLogger);
 	Atoms::initAtoms();
 
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdReader>();
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsVariationReader>();
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdGenerator>();
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsAttributes>();
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdClothReader>();
-	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsMetadata>();
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsCrowdReader> AtomsCrowdReaderWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdReader, AtomsCrowdReaderWrapper>();
+
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsVariationReader> AtomsVariationReaderWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsVariationReader, AtomsVariationReaderWrapper>();
+
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsCrowdGenerator> AtomsCrowdGeneratorWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdGenerator, AtomsCrowdGeneratorWrapper>();
+
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsAttributes> AtomsAttributesWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsAttributes, AtomsAttributesWrapper>();
+
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsCrowdClothReader> AtomsCrowdClothReaderWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsCrowdClothReader, AtomsCrowdClothReaderWrapper>();
+
+	typedef GafferBindings::DependencyNodeWrapper<AtomsGaffer::AtomsMetadata> AtomsMetadataWrapper;
+	GafferBindings::DependencyNodeClass<AtomsGaffer::AtomsMetadata, AtomsMetadataWrapper>();
 }

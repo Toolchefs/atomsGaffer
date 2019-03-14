@@ -123,7 +123,8 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
                 IECoreScene::MeshPrimitivePtr& result,
                 IECoreScene::ConstMeshPrimitivePtr& meshPrim,
                 IECore::ConstCompoundObjectPtr& meshAttributes,
-                const std::vector<Imath::M44d>& worldMatrices
+                const std::vector<Imath::M44d>& worldMatrices,
+                const Imath::M44f& transformMatrix
         		) const;
 
         void applyBlendShapesDeformer(
@@ -131,14 +132,16 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
                 IECoreScene::MeshPrimitivePtr& result,
                 const IECore::CompoundData* metadataData,
                 const IECore::CompoundDataMap& pointVariablesData,
-                const int agentIdPointIndex
+                const int agentIdPointIndex,
+				const Imath::M44f& transformMatrix
         		) const;
 
 		bool applyClothDeformer(
 				const ScenePath &branchPath,
 				IECoreScene::MeshPrimitivePtr& result,
 				IECore::ConstCompoundDataPtr& cloth,
-				const Imath::M44f rootMatrix
+				const Imath::M44f& rootMatrix,
+				const Imath::M44f& transformMatrix
 				) const;
 
         Imath::M44f agentRootMatrix( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context ) const;

@@ -53,10 +53,14 @@
 #include "AtomsCore/Metadata/Box3Metadata.h"
 #include "AtomsCore/Metadata/BoolMetadata.h"
 #include "AtomsCore/Metadata/ArrayMetadata.h"
+#include "AtomsCore/Metadata/MatrixMetadata.h"
+#include "AtomsCore/Metadata/StringMetadata.h"
 #include "AtomsCore/Metadata/IntArrayMetadata.h"
 #include "AtomsCore/Metadata/DoubleArrayMetadata.h"
 #include "AtomsCore/Metadata/Vector3ArrayMetadata.h"
+#include "AtomsCore/Metadata/StringArrayMetadata.h"
 
+#include <list>
 
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsVariationReader );
 
@@ -232,10 +236,20 @@ class AtomsVariationReader::EngineData : public Data
 
 public :
 
+    class AtomsDagNode
+    {
+    public:
+        std::string name;
+        AtomsPtr<AtomsCore::MapMetadata> data;
+        std::set<std::string> variations;
+        std::map<std::string, AtomsDagNode> children;
+    };
+
     EngineData( const std::string& filePath ):
         m_filePath( filePath )
     {
         m_hierarchy = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+        m_root.children.clear();
         if ( filePath.empty() )
             return;
 
@@ -258,7 +272,9 @@ public :
         // In Gaffer the full path is built so this build a tree containing the full hierarchy of all the meshes
         for ( size_t aTypeId = 0; aTypeId != agentTypeNames.size(); ++aTypeId )
         {
+
             const auto& agentTypeName = agentTypeNames[aTypeId];
+            auto& agentTypeRoot = m_root.children[agentTypeName];
             auto agentTypePtr = m_variations.getAgentTypeVariationPtr( agentTypeName);
             if ( !agentTypePtr )
                 continue;
@@ -276,9 +292,11 @@ public :
                 if ( !variationPtr )
                     continue;
 
+                m_defaultSets.push_back( agentTypeName + ":" + variationName );
+
                 AtomsPtr<AtomsCore::MapMetadata> variationHierarchy( new AtomsCore::MapMetadata );
 
-                for( int cId = 0; cId < variationPtr->numCombinations(); ++cId )
+                for(unsigned int cId = 0; cId < variationPtr->numCombinations(); ++cId )
                 {
                     auto& combination = variationPtr->getCombinationAtIndex( cId );
 
@@ -294,8 +312,12 @@ public :
                     AtomsUtils::splitString( combination.first, '|', objectNames );
 
                     auto currentMap = variationHierarchy;
+                    AtomsDagNode* currentRoot = &agentTypeRoot;
+                    currentRoot->variations.insert(variationName);
                     for( const auto& objName: objectNames )
                     {
+                        currentRoot = &currentRoot->children[objName];
+                        currentRoot->variations.insert( variationName );
                         auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>( objName );
                         if ( !objIt )
                         {
@@ -318,9 +340,10 @@ public :
                     if ( !lodPtr )
                         continue;
 
+                    m_defaultSets.push_back( agentTypeName + ":" + variationName + ":" + lodName );
                     AtomsPtr<AtomsCore::MapMetadata> lodHierarchy( new AtomsCore::MapMetadata );
 
-                    for( int cId = 0; cId < lodPtr->numCombinations(); ++cId ) {
+                    for( unsigned int cId = 0; cId < lodPtr->numCombinations(); ++cId ) {
                         auto &combinationLod = lodPtr->getCombinationAtIndex(cId);
 
                         auto geoPtr = agentTypePtr->getGeometryPtr( combinationLod.first );
@@ -337,7 +360,11 @@ public :
                         AtomsUtils::splitString( combinationLod.first, '|', lodObjectNames );
 
                         auto currentMap = lodHierarchy;
+                        AtomsDagNode* currentRoot = &agentTypeRoot;
+                        currentRoot->variations.insert( variationName + ":" + lodName );
                         for ( const auto &objName: lodObjectNames ) {
+                            currentRoot = &currentRoot->children[objName];
+                            currentRoot->variations.insert( variationName + ":" + lodName );
                             auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
                             if (!objIt) {
                                 AtomsCore::MapMetadata emptyData;
@@ -359,6 +386,206 @@ public :
         }
     }
 
+    void flatMeshHierarchy( AtomsCore::MapMetadata* geos, AtomsPtr<AtomsCore::MapMetadata>& outMap, AtomsDagNode* rootNode )
+    {
+        auto childrenPtr = geos->getTypedEntry<AtomsCore::MapMetadata>( "children" );
+        if ( !childrenPtr )
+            return;
+
+        for ( auto it = childrenPtr->begin(); it != childrenPtr->end(); it++ )
+        {
+            auto meshGroup = std::static_pointer_cast<AtomsCore::MapMetadata>( it->second) ;
+            auto meshMeta = meshGroup->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
+            if ( meshMeta )
+            {
+                outMap->addEntry( it->first, it->second, false );
+            }
+
+            AtomsDagNode* childRootNode = nullptr;
+            if ( rootNode ) {
+                childRootNode = &rootNode->children[it->first];
+                childRootNode->data = meshGroup;
+            }
+            flatMeshHierarchy( meshGroup.get(), outMap, childRootNode );
+        }
+    }
+
+    void swapMapGeoData(AtomsPtr<AtomsCore::MapMetadata>& inputGeoMap, AtomsPtr<AtomsCore::MapMetadata>& outMap,
+                        const std::string& name)
+    {
+        auto atomsAttr = inputGeoMap->getEntry(name);
+        if (atomsAttr)
+        {
+            outMap->addEntry(name, atomsAttr, false);
+            inputGeoMap->eraseEntry(name);
+        }
+    }
+
+    AtomsPtr<AtomsCore::MapMetadata> convertMeshFormatV2( AtomsPtr<AtomsCore::MapMetadata> inputMap )
+    {
+        if (!inputMap)
+            return inputMap;
+
+        auto versionPtr = inputMap->getTypedEntry<AtomsCore::IntMetadata>("version");
+        if (versionPtr && versionPtr->value() == 2)
+            return inputMap;
+
+        AtomsPtr<AtomsCore::MapMetadata> geoMap(new AtomsCore::MapMetadata);
+
+        AtomsCore::IntMetadata version(2);
+        geoMap->addEntry("version", &version);
+
+        AtomsPtr<AtomsCore::MapMetadata> childrenMap(new AtomsCore::MapMetadata);
+        auto childrenMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(childrenMap);
+        geoMap->addEntry("children", childrenMapBasePtr, false);
+
+        for (auto it = inputMap->begin(); it != inputMap->end(); ++it)
+        {
+            if (it->second->typeId() == AtomsCore::MeshMetadata::staticTypeId())
+            {
+                AtomsPtr<AtomsCore::MapMetadata> geoContainer(new AtomsCore::MapMetadata);
+                auto geoContainerBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(geoContainer);
+                childrenMap->addEntry(it->first, geoContainerBasePtr, false);
+
+                auto materialAttributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto materialAttributesbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(materialAttributes);
+                geoContainer->addEntry("material", materialAttributesbasePtr, false);
+
+                auto attributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto attributesbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(attributes);
+                geoContainer->addEntry("attributes", attributesbasePtr, false);
+
+                auto primVars = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto primVarsbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(primVars);
+                geoContainer->addEntry("primVars", primVarsbasePtr, false);
+
+                AtomsCore::MatrixMetadata mtx;
+                geoContainer->addEntry("matrix", &mtx);
+
+                AtomsCore::MatrixMetadata wmtx;
+                geoContainer->addEntry("worldMatrix", &wmtx);
+
+                AtomsCore::Vector3 emptyVec(0.0, 0.0, 0.0);
+                AtomsCore::Vector3Metadata pivotMeta(emptyVec);
+                geoContainer->addEntry("pivot", &pivotMeta);
+
+                AtomsCore::Vector3Metadata translationMeta(emptyVec);
+                geoContainer->addEntry("translation", &translationMeta);
+
+                AtomsCore::Vector3 scaleVec(1.0, 1.0, 1.0);
+                AtomsCore::Vector3Metadata scaleMeta(scaleVec);
+                geoContainer->addEntry("scale", &scaleMeta);
+
+                AtomsCore::Vector3Metadata rotateMeta(emptyVec);
+                geoContainer->addEntry("rotation", &rotateMeta);
+
+                AtomsCore::IntMetadata rotateOrderMeta;
+                rotateOrderMeta.set(AtomsCore::Euler::XYZ);
+                geoContainer->addEntry("rotationOrder", &rotateOrderMeta);
+
+                AtomsCore::StringArrayMetadata sets;
+                geoContainer->addEntry("sets", &sets);
+
+                auto basePtr = std::static_pointer_cast<AtomsCore::Metadata>(it->second);
+                geoContainer->addEntry("geo", basePtr, false);
+                continue;
+            }
+
+            if (it->second->typeId() != AtomsCore::MapMetadata::staticTypeId())
+            {
+                continue;
+            }
+
+            auto inputGeoMap = std::static_pointer_cast<AtomsCore::MapMetadata>(it->second);
+
+            auto cloth = inputGeoMap->getTypedEntry<AtomsCore::MeshMetadata>("cloth");
+            if (cloth)
+            {
+                auto clothBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(cloth);
+                inputGeoMap->addEntry("geo", clothBasePtr, false);
+                AtomsCore::BoolMetadata clothFlag(true);
+                inputGeoMap->addEntry("cloth", &clothFlag);
+            }
+
+            auto materialAttributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>("material");
+            if (!materialAttributes)
+            {
+                materialAttributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto materialBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(materialAttributes);
+                inputGeoMap->addEntry("material", materialBasePtr, false);
+            }
+
+            swapMapGeoData(inputGeoMap, materialAttributes, "color");
+            swapMapGeoData(inputGeoMap, materialAttributes, "colorTexture");
+            swapMapGeoData(inputGeoMap, materialAttributes, "cosinePower");
+            swapMapGeoData(inputGeoMap, materialAttributes, "specularPower");
+            swapMapGeoData(inputGeoMap, materialAttributes, "specularRollOff");
+            swapMapGeoData(inputGeoMap, materialAttributes, "eccentricity");
+            swapMapGeoData(inputGeoMap, materialAttributes, "specularColor");
+            swapMapGeoData(inputGeoMap, materialAttributes, "specularTexture");
+
+            auto attributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>("attributes");
+            if (!attributes)
+            {
+                attributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto attributesBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(attributes);
+                inputGeoMap->addEntry("attributes", attributesBasePtr, false);
+            }
+
+            swapMapGeoData(inputGeoMap, attributes, "atoms");
+            swapMapGeoData(inputGeoMap, attributes, "arnold");
+            swapMapGeoData(inputGeoMap, attributes, "vray");
+            swapMapGeoData(inputGeoMap, attributes, "renderman");
+
+            auto primVars = geoMap->getTypedEntry<AtomsCore::MapMetadata>("primVars");
+            if (!primVars)
+            {
+                primVars = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
+                auto primVarsBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(primVars);
+                inputGeoMap->addEntry("primVars", primVarsBasePtr, false);
+            }
+
+            swapMapGeoData(inputGeoMap, primVars, "xgen_Pref");
+            swapMapGeoData(inputGeoMap, primVars, "__Nref");
+            swapMapGeoData(inputGeoMap, primVars, "__WNref");
+            swapMapGeoData(inputGeoMap, primVars, "__Pref");
+            swapMapGeoData(inputGeoMap, primVars, "__WPref");
+
+
+            AtomsCore::MatrixMetadata mtx;
+            inputGeoMap->addEntry("matrix", &mtx);
+
+            AtomsCore::MatrixMetadata wmtx;
+            inputGeoMap->addEntry("worldMatrix", &wmtx);
+
+            AtomsCore::Vector3 emptyVec(0.0, 0.0, 0.0);
+            AtomsCore::Vector3Metadata pivotMeta(emptyVec);
+            inputGeoMap->addEntry("pivot", &pivotMeta);
+
+            AtomsCore::Vector3Metadata translationMeta(emptyVec);
+            inputGeoMap->addEntry("translation", &translationMeta);
+
+            AtomsCore::Vector3 scaleVec(1.0, 1.0, 1.0);
+            AtomsCore::Vector3Metadata scaleMeta(scaleVec);
+            inputGeoMap->addEntry("scale", &scaleMeta);
+
+            AtomsCore::Vector3Metadata rotateMeta(emptyVec);
+            inputGeoMap->addEntry("rotation", &rotateMeta);
+
+            AtomsCore::IntMetadata rotateOrderMeta;
+            rotateOrderMeta.set(AtomsCore::Euler::XYZ);
+            inputGeoMap->addEntry("rotationOrder", &rotateOrderMeta);
+
+            AtomsCore::StringArrayMetadata sets;
+            inputGeoMap->addEntry("sets", &sets);
+
+            auto inputGeoMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(inputGeoMap);
+            childrenMap->addEntry(it->first, inputGeoMapBasePtr, false);
+        }
+
+        return geoMap;
+    }
+
     void loadAgentTypeMesh( Atoms::AgentTypeVariationCPtr agentTypePtr, const std::string& agentTypeName )
     {
         auto geoNames = agentTypePtr->getGeometryNames();
@@ -371,11 +598,15 @@ public :
             if ( geoPtr->getGeometryFile().find(".groom") != std::string::npos )
                 continue;
 
-            auto atomsGeoMap = Atoms::loadMesh( geoPtr->getGeometryFile(), geoPtr->getGeometryFilter() );
-            if ( !atomsGeoMap )
+            auto inGeoMap = Atoms::loadMesh( geoPtr->getGeometryFile(), geoPtr->getGeometryFilter() );
+            if ( !inGeoMap )
             {
                 throw InvalidArgumentException( "AtomsVariationsReader: Invalid geo: " + geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter() );
             }
+
+            auto* agentTypeRoot = &m_root.children[agentTypeName];
+            AtomsPtr<AtomsCore::MapMetadata> atomsGeoMap( new AtomsCore::MapMetadata );
+            flatMeshHierarchy(inGeoMap.get(), atomsGeoMap, agentTypeRoot);
 
             //compute the bouding box
             AtomsCore::Box3f bbox;
@@ -385,29 +616,33 @@ public :
                     continue;
 
                 auto geoMap = std::static_pointer_cast<AtomsCore::MapMetadata>( meshIt->second );
-                AtomsPtr<const AtomsCore::MapMetadata> atomsMapPtr = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "atoms" );
-                if ( atomsMapPtr )
-                {
-                    // Skip this mesh if it hase the cloth hide tag
-                    auto hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>( ATOMS_CLOTH_HIDE_MESH );
-                    if ( hideMeshPtr && hideMeshPtr->value() )
-                        continue;
+                AtomsPtr<const AtomsCore::MapMetadata> attributesMapPtr =
+                        geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "atoms" );
 
-                    // Skip this mesh if it has the preview tag
-                    hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>( ATOMS_PREVIEW_MESH );
-                    if ( hideMeshPtr && hideMeshPtr->value() )
-                        continue;
+                if ( attributesMapPtr )
+                {
+                    AtomsPtr<const AtomsCore::MapMetadata> atomsMapPtr =
+                            attributesMapPtr->getTypedEntry<const AtomsCore::MapMetadata>(
+                            "atoms");
+                    if (atomsMapPtr) {
+                        // Skip this mesh if it hase the cloth hide tag
+                        auto hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>(
+                                ATOMS_CLOTH_HIDE_MESH);
+                        if (hideMeshPtr && hideMeshPtr->value())
+                            continue;
+
+                        // Skip this mesh if it has the preview tag
+                        hideMeshPtr = atomsMapPtr->getTypedEntry<const AtomsCore::BoolMetadata>(ATOMS_PREVIEW_MESH);
+                        if (hideMeshPtr && hideMeshPtr->value())
+                            continue;
+                    }
                 }
 
 
                 auto meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
                 if ( !meshMeta )
                 {
-                    meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "cloth" );
-                    if ( !meshMeta )
-                    {
-                        continue;
-                    }
+                    continue;
                 }
 
                 for( const auto& p: meshMeta->get().points() )
@@ -441,9 +676,48 @@ public :
         return m_hierarchy;
     }
 
+    const AtomsDagNode& root() const
+    {
+        return m_root;
+    }
+
     const std::map<std::string, std::map<std::string, AtomsPtr<AtomsCore::MapMetadata>>>& meshCache() const
     {
         return m_meshesFileCache;
+    }
+
+    void collectAllPathFromSetName(
+            const std::string& setName,
+            const AtomsDagNode* node,
+            std::vector<std::string>& paths,
+            const std::string& currentPath ) const
+    {
+        if ( node->data )
+        {
+            auto sets = node->data->getTypedEntry<const AtomsCore::StringArrayMetadata>( "sets" );
+            if ( sets )
+            {
+                auto& setVec = sets->get();
+                for ( auto& currentSet: setVec )
+                {
+                    if ( currentSet == setName )
+                    {
+                        for ( auto& variation: node->variations )
+                            paths.push_back( variation + "/" + currentPath );
+                        break;
+                    }
+                }
+            }
+        }
+        for ( auto it = node->children.cbegin(); it != node->children.cend(); ++it )
+        {
+            collectAllPathFromSetName( setName, &it->second, paths, currentPath + "/" + it->first );
+        }
+    }
+
+    bool isDefaultSet( const std::string& setName ) const
+    {
+        return std::find( m_defaultSets.cbegin(), m_defaultSets.cend(), setName) != m_defaultSets.cend();
     }
 
 protected :
@@ -476,6 +750,9 @@ private :
 
     AtomsPtr<AtomsCore::MapMetadata> m_hierarchy;
 
+    std::vector<std::string> m_defaultSets;
+
+    AtomsDagNode m_root;
 };
 
 size_t AtomsVariationReader::g_firstPlugIndex = 0;
@@ -633,9 +910,56 @@ void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::C
 	h.append( &path.front(), path.size() );
 }
 
+AtomsPtr<const AtomsCore::MapMetadata> AtomsVariationReader::getNodeDataFromHierarchy( const ScenePath &path ) const
+{
+    ConstEngineDataPtr engineData = static_pointer_cast<const EngineData>( enginePlug()->getValue() );
+    if ( !engineData )
+    {
+        return nullptr;
+    }
+
+    auto& root = engineData->root();
+    auto aTypeIt = root.children.find( path[0] );
+    if ( aTypeIt == root.children.end() )
+        return nullptr;
+
+    const EngineData::AtomsDagNode* currentNode = &aTypeIt->second;
+    for ( size_t i = 2; i < path.size(); ++i )
+    {
+        auto meshIt = currentNode->children.find( path[i] );
+        if ( meshIt == currentNode->children.end())
+        {
+            return nullptr;
+        }
+        currentNode = &meshIt->second;
+    }
+
+    if ( currentNode )
+    {
+        return currentNode->data;
+    }
+
+    return nullptr;
+}
+
 Imath::M44f AtomsVariationReader::computeTransform( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent ) const
 {
     // The Atoms mesh are stored in world space without transformation
+    if( path.size() < 3 )
+    {
+        return parent->transformPlug()->defaultValue();
+    }
+
+    auto data = getNodeDataFromHierarchy( path );
+    if ( data )
+    {
+        auto matrixPtr = data->getTypedEntry<const AtomsCore::MatrixMetadata>( "matrix" );
+        if ( matrixPtr )
+        {
+            return Imath::M44f( matrixPtr->get() );
+        }
+    }
+
 	return {};
 }
 
@@ -682,7 +1006,35 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
     auto geoData = agentTypeData->getGeometryPtr( geoPathName );
     if ( !geoData )
     {
-        return parent->attributesPlug()->defaultValue();
+        // It a transform so set get eh attributes from the dag node
+        auto dagNodeMap = getNodeDataFromHierarchy( path );
+        if ( dagNodeMap )
+        {
+            auto attributesMap = dagNodeMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+            if ( attributesMap ) {
+                CompoundObjectPtr result = new CompoundObject;
+                for (auto attrIt = attributesMap->cbegin(); attrIt != attributesMap->cend(); ++attrIt)
+                {
+                    if (attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman")
+                        continue;
+                    auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>(attrIt->second);
+                    if (atomsAttributeMap) {
+                        for (auto meshAttrIt = atomsAttributeMap->cbegin();
+                             meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
+                            auto data = translator.translate(meshAttrIt->second);
+                            if (data) {
+                                result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
+                            }
+                        }
+                    }
+                }
+                return result;
+            }
+        }
+        else {
+            return parent->attributesPlug()->defaultValue();
+        }
+
     }
 
     if ( geoData->getGeometryFile().find( ".groom" ) != std::string::npos )
@@ -737,85 +1089,81 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
             }
         }
 
+
         // Convert the atoms metadata to gaffer attribute
-        auto atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "atoms" );
-        if ( atomsAttributeMap )
-        {
-            for (auto meshAttrIt = atomsAttributeMap->cbegin(); meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt)
+        auto attributesMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+        if ( attributesMap ) {
+            for (auto attrIt = attributesMap->cbegin(); attrIt != attributesMap->cend(); ++attrIt)
             {
-                auto data = translator.translate( meshAttrIt->second );
-                if ( data )
-                {
-                    result->members()["user:atoms:" + meshAttrIt->first] = data;
+                if (attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman")
+                    continue;
+                auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>(attrIt->second);
+                if (atomsAttributeMap) {
+                    for (auto meshAttrIt = atomsAttributeMap->cbegin();
+                         meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
+                        auto data = translator.translate(meshAttrIt->second);
+                        if (data) {
+                            result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
+                        }
+                    }
                 }
             }
-        }
-
-        // Convert the arnold metadata to gaffer attribute
-        atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "arnold" );
-        if ( !atomsAttributeMap )
-        {
-            continue;
-        }
-
-        for (auto meshAttrIt = atomsAttributeMap->cbegin(); meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt)
-        {
-            auto data = translator.translate( meshAttrIt->second );
-            if ( !data )
-            {
+            // Convert the arnold metadata to gaffer attribute
+            auto atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>("arnold");
+            if (!atomsAttributeMap) {
                 continue;
             }
 
-            // Convert the arnold visible_in_* attribute to ai:visibility:*
-            std::string aiParameter = meshAttrIt->first;
-            auto visIndex = meshAttrIt->first.find( "visible_in_");
-            bool handleParam = false;
-            if ( visIndex != std::string::npos )
-            {
-                aiParameter = "visibility:" + meshAttrIt->first.substr(visIndex + 11);
-                handleParam = true;
-            }
+            for (auto meshAttrIt = atomsAttributeMap->cbegin(); meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
+                auto data = translator.translate(meshAttrIt->second);
+                if (!data) {
+                    continue;
+                }
 
-            // Convert the arnold subdiv* attribute to ai:polymesh:*
-            visIndex = meshAttrIt->first.find( "subdiv");
-            if ( visIndex != std::string::npos )
-            {
-                aiParameter = "polymesh:" + meshAttrIt->first;
-                handleParam = true;
-            }
+                // Convert the arnold visible_in_* attribute to ai:visibility:*
+                std::string aiParameter = meshAttrIt->first;
+                auto visIndex = meshAttrIt->first.find("visible_in_");
+                bool handleParam = false;
+                if (visIndex != std::string::npos) {
+                    aiParameter = "visibility:" + meshAttrIt->first.substr(visIndex + 11);
+                    handleParam = true;
+                }
 
-            // Sett only polymesh arnold attributes
-            if ( handleParam ||
-                (meshAttrIt->first == "sidedness" ||
-                meshAttrIt->first == "receive_shadows" ||
-                meshAttrIt->first == "self_shadows" ||
-                meshAttrIt->first == "invert_normals" ||
-                meshAttrIt->first == "opaque" ||
-                meshAttrIt->first == "matte" ||
-                meshAttrIt->first == "smoothing"
-                )
-            )
-            {
-                switch ( data->typeId() )
-                {
-                    case IECore::TypeId::DoubleDataTypeId:
-                    {
-                        FloatDataPtr fData = new FloatData;
-                        fData->writable() = runTimeCast<const DoubleData>(data)->readable();
-                        result->members()["ai:" + aiParameter] = fData;
-                        break;
-                    }
-                    case IECore::TypeId::V3dDataTypeId:
-                    {
-                        V3fDataPtr fData = new V3fData;
-                        fData->writable() = Imath::V3f(runTimeCast<const V3dData>(data)->readable());
-                        result->members()["ai:" + aiParameter] = fData;
-                        break;
-                    }
-                    default:
-                    {
-                        result->members()["ai:" + aiParameter] = data;
-                        break;
+                // Convert the arnold subdiv* attribute to ai:polymesh:*
+                visIndex = meshAttrIt->first.find("subdiv");
+                if (visIndex != std::string::npos) {
+                    aiParameter = "polymesh:" + meshAttrIt->first;
+                    handleParam = true;
+                }
+
+                // Sett only polymesh arnold attributes
+                if (handleParam ||
+                    (meshAttrIt->first == "sidedness" ||
+                     meshAttrIt->first == "receive_shadows" ||
+                     meshAttrIt->first == "self_shadows" ||
+                     meshAttrIt->first == "invert_normals" ||
+                     meshAttrIt->first == "opaque" ||
+                     meshAttrIt->first == "matte" ||
+                     meshAttrIt->first == "smoothing"
+                    )
+                        ) {
+                    switch (data->typeId()) {
+                        case IECore::TypeId::DoubleDataTypeId: {
+                            FloatDataPtr fData = new FloatData;
+                            fData->writable() = runTimeCast<const DoubleData>(data)->readable();
+                            result->members()["ai:" + aiParameter] = fData;
+                            break;
+                        }
+                        case IECore::TypeId::V3dDataTypeId: {
+                            V3fDataPtr fData = new V3fData;
+                            fData->writable() = Imath::V3f(runTimeCast<const V3dData>(data)->readable());
+                            result->members()["ai:" + aiParameter] = fData;
+                            break;
+                        }
+                        default: {
+                            result->members()["ai:" + aiParameter] = data;
+                            break;
+                        }
                     }
                 }
             }
@@ -844,6 +1192,7 @@ void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Cont
 
 IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent ) const
 {
+
 	if( path.size() < 3 )
 	{
 		return parent->objectPlug()->defaultValue();
@@ -869,6 +1218,8 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
     {
         geoPathName += "|" + path[i].string();
     }
+
+
 
     auto geoData = agentTypeData->getGeometryPtr( geoPathName );
     if ( !geoData )
@@ -1021,6 +1372,31 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeSetNames( 
             }
         }
     }
+
+    const EngineData::AtomsDagNode* rootNode = &engineData->root();
+    std::list<const EngineData::AtomsDagNode*> nodes;
+    nodes.push_back(rootNode);
+    while ( nodes.size() > 0 )
+    {
+        const EngineData::AtomsDagNode* node = nodes.front();
+        nodes.pop_front();
+        if ( node->data )
+        {
+            auto setsData = node->data->getTypedEntry<const AtomsCore::StringArrayMetadata>("sets");
+            if ( setsData )
+            {
+                for (const auto& setName: setsData->get())
+                {
+                    if ( std::find(result.begin(), result.end(), setName) == result.end() )
+                        result.emplace_back(setName);
+                }
+            }
+        }
+
+        for ( auto it = node->children.cbegin(); it != node->children.cend(); ++it ) {
+            nodes.push_back( &it->second );
+        }
+    }
 	return resultData;
 }
 
@@ -1041,8 +1417,21 @@ IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::
         return resultData;
     }
     auto &result = resultData->writable();
-    auto &variations = engineData->variations();
 
+    if ( !engineData->isDefaultSet( setName ) )  {
+        const EngineData::AtomsDagNode *rootNode = &engineData->root();
+        for ( auto it = rootNode->children.cbegin(); it != rootNode->children.cend(); ++it ) {
+            const std::string &agentTypeName = it->first;
+            std::vector<std::string> paths;
+            engineData->collectAllPathFromSetName( setName.string(), &it->second, paths, "/" );
+
+            for ( auto &path: paths )
+                result.addPath( "/" + agentTypeName + "/" + path );
+        }
+        return resultData;
+    }
+
+    auto &variations = engineData->variations();
     const std::string& pathName = setName;
     auto sepIndex = pathName.find( ':' );
     if ( sepIndex == std::string::npos )

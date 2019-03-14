@@ -200,6 +200,8 @@ ConstObjectPtr AtomsCrowdClothReader::computeObject( const ScenePath &path, cons
             }
         }
 
+        Imath::Box3d agentBBox;
+        agentBBox.makeEmpty();
         for( const auto& meshName: meshNames )
         {
             CompoundDataPtr meshCompound = new CompoundData;
@@ -213,18 +215,18 @@ ConstObjectPtr AtomsCrowdClothReader::computeObject( const ScenePath &path, cons
             cache.loadAgentClothMesh( frame, agentId, meshName, p->writable(), n->writable() );
             cache.loadAgentClothMeshBoundingBox( frame, agentId, meshName, bbox->writable() );
             stackOrder->writable() = cache.getAgentClothMeshStackOrder( frame, agentId, meshName );
-
             meshData[ "P" ] = p;
             meshData[ "N" ] = n;
             meshData[ "boundingBox" ] = bbox;
             meshData[ "stackOrder" ] = stackOrder;
 
             agentData[ meshName ] = meshCompound;
+            agentBBox.extendBy(bbox->readable());
         }
 
-        Box3dDataPtr bbox = new Box3dData;
-        cache.loadAgentClothBoundingBox( frame, agentId, bbox->writable() );
-        agentData[ "boundingBox" ] = bbox;
+        Box3dDataPtr agBox = new Box3dData;
+        agBox->writable() = agentBBox;
+        agentData[ "boundingBox" ] = agBox;
 
         clothData[ agentIdStr ] = agentCompound;
     }

@@ -59,6 +59,7 @@
 #include "AtomsCore/Metadata/DoubleArrayMetadata.h"
 #include "AtomsCore/Metadata/Vector3ArrayMetadata.h"
 #include "AtomsCore/Metadata/StringArrayMetadata.h"
+#include "AtomsCore/Metadata/BoolArrayMetadata.h"
 
 #include <list>
 
@@ -214,13 +215,46 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
     }
 
     // Convert the atoms metadata
-    auto atomsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "atoms" );
-    if ( atomsMap && atomsMap->size() > 0 )
+    auto &translator = AtomsMetadataTranslator::instance();
+    auto attributesMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "attributes" );
+    if ( attributesMap ) {
+        auto atomsMap = attributesMap->getTypedEntry<const AtomsCore::MapMetadata>("atoms");
+        if (atomsMap && atomsMap->size() > 0) {
+
+            for (auto it = atomsMap->cbegin(); it != atomsMap->cend(); ++it) {
+                meshPtr->variables[it->first] = PrimitiveVariable(PrimitiveVariable::Constant,
+                                                                  translator.translate(it->second));
+            }
+        }
+    }
+
+
+    auto primVarsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "primVars" );
+    if ( primVarsMap )
     {
-        auto &translator = AtomsMetadataTranslator::instance();
-        for ( auto it = atomsMap->cbegin(); it != atomsMap->cend(); ++it )
+        for ( auto primIt = primVarsMap->cbegin(); primIt != primVarsMap->cend(); ++primIt )
         {
-            meshPtr->variables[it->first] =  PrimitiveVariable( PrimitiveVariable::Constant, translator.translate(it->second) );
+            if ( primIt->second->typeId() != AtomsCore::MapMetadata::staticTypeId() )
+                continue;
+
+            auto primPtr = std::static_pointer_cast<const AtomsCore::MapMetadata>(primIt->second);
+            auto interpolationPtr = primPtr->getTypedEntry<AtomsCore::StringMetadata>( "interpolation" );
+            auto dataPtr = primPtr->getEntry( "data" );
+            if ( interpolationPtr && dataPtr )
+            {
+                auto interpolation = PrimitiveVariable::Constant;
+                if ( interpolationPtr->get() == "uniform" )
+                    interpolation = PrimitiveVariable::Uniform;
+                else if ( interpolationPtr->get() == "vertex" )
+                    interpolation = PrimitiveVariable::Vertex;
+                if ( interpolationPtr->get() == "varying" )
+                    interpolation = PrimitiveVariable::Varying;
+                if ( interpolationPtr->get() == "faceVarying" )
+                    interpolation = PrimitiveVariable::FaceVarying;
+
+                meshPtr->variables[primIt->first] = PrimitiveVariable( interpolation,
+                                                                  translator.translate( dataPtr ) );
+            }
         }
     }
 
@@ -344,7 +378,7 @@ public :
                     AtomsPtr<AtomsCore::MapMetadata> lodHierarchy( new AtomsCore::MapMetadata );
 
                     for( unsigned int cId = 0; cId < lodPtr->numCombinations(); ++cId ) {
-                        auto &combinationLod = lodPtr->getCombinationAtIndex(cId);
+                        auto &combinationLod = lodPtr->getCombinationAtIndex( cId );
 
                         auto geoPtr = agentTypePtr->getGeometryPtr( combinationLod.first );
                         if (!geoPtr)
@@ -394,10 +428,9 @@ public :
 
         for ( auto it = childrenPtr->begin(); it != childrenPtr->end(); it++ )
         {
-            auto meshGroup = std::static_pointer_cast<AtomsCore::MapMetadata>( it->second) ;
+            auto meshGroup = std::static_pointer_cast<AtomsCore::MapMetadata>( it->second );
             auto meshMeta = meshGroup->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
-            if ( meshMeta )
-            {
+            if ( meshMeta ) {
                 outMap->addEntry( it->first, it->second, false );
             }
 
@@ -410,177 +443,184 @@ public :
         }
     }
 
-    void swapMapGeoData(AtomsPtr<AtomsCore::MapMetadata>& inputGeoMap, AtomsPtr<AtomsCore::MapMetadata>& outMap,
-                        const std::string& name)
+    void swapMapGeoData( AtomsPtr<AtomsCore::MapMetadata>& inputGeoMap, AtomsPtr<AtomsCore::MapMetadata>& outMap,
+                        const std::string& name )
     {
-        auto atomsAttr = inputGeoMap->getEntry(name);
-        if (atomsAttr)
-        {
-            outMap->addEntry(name, atomsAttr, false);
+        auto atomsAttr = inputGeoMap->getEntry( name );
+        if ( atomsAttr ) {
+            outMap->addEntry( name, atomsAttr, false );
+            inputGeoMap->eraseEntry(name);
+        }
+    }
+
+    void swapPrimVarData( AtomsPtr<AtomsCore::MapMetadata>& inputGeoMap, AtomsPtr<AtomsCore::MapMetadata>& outMap,
+                         const std::string& name )
+    {
+        auto atomsAttr = inputGeoMap->getEntry( name );
+        if ( atomsAttr ) {
+            AtomsPtr<AtomsCore::MapMetadata> data( new AtomsCore::MapMetadata );
+            AtomsCore::StringMetadata interpolation("vertex");
+            data->addEntry("interpolation", &interpolation);
+            data->addEntry("data", atomsAttr, false);
+            auto dataPtr = std::static_pointer_cast<AtomsCore::Metadata>( data );
+            outMap->addEntry( name, dataPtr, false );
             inputGeoMap->eraseEntry(name);
         }
     }
 
     AtomsPtr<AtomsCore::MapMetadata> convertMeshFormatV2( AtomsPtr<AtomsCore::MapMetadata> inputMap )
     {
-        if (!inputMap)
+        if ( !inputMap )
             return inputMap;
 
-        auto versionPtr = inputMap->getTypedEntry<AtomsCore::IntMetadata>("version");
-        if (versionPtr && versionPtr->value() == 2)
+        auto versionPtr = inputMap->getTypedEntry<AtomsCore::IntMetadata>( "version" );
+        if ( versionPtr && versionPtr->value() == 2 )
             return inputMap;
 
-        AtomsPtr<AtomsCore::MapMetadata> geoMap(new AtomsCore::MapMetadata);
+        AtomsPtr<AtomsCore::MapMetadata> geoMap( new AtomsCore::MapMetadata );
 
-        AtomsCore::IntMetadata version(2);
-        geoMap->addEntry("version", &version);
+        AtomsCore::IntMetadata version( 2 );
+        geoMap->addEntry( "version", &version );
 
-        AtomsPtr<AtomsCore::MapMetadata> childrenMap(new AtomsCore::MapMetadata);
-        auto childrenMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(childrenMap);
-        geoMap->addEntry("children", childrenMapBasePtr, false);
+        AtomsPtr<AtomsCore::MapMetadata> childrenMap( new AtomsCore::MapMetadata );
+        auto childrenMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( childrenMap );
+        geoMap->addEntry( "children", childrenMapBasePtr, false );
 
-        for (auto it = inputMap->begin(); it != inputMap->end(); ++it)
-        {
-            if (it->second->typeId() == AtomsCore::MeshMetadata::staticTypeId())
-            {
-                AtomsPtr<AtomsCore::MapMetadata> geoContainer(new AtomsCore::MapMetadata);
-                auto geoContainerBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(geoContainer);
-                childrenMap->addEntry(it->first, geoContainerBasePtr, false);
+        for ( auto it = inputMap->begin(); it != inputMap->end(); ++it ) {
+            if ( it->second->typeId() == AtomsCore::MeshMetadata::staticTypeId() ) {
+                AtomsPtr<AtomsCore::MapMetadata> geoContainer( new AtomsCore::MapMetadata );
+                auto geoContainerBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( geoContainer );
+                childrenMap->addEntry( it->first, geoContainerBasePtr, false );
 
-                auto materialAttributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto materialAttributesbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(materialAttributes);
-                geoContainer->addEntry("material", materialAttributesbasePtr, false);
+                auto materialAttributes = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                auto materialAttributesBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( materialAttributes );
+                geoContainer->addEntry( "material", materialAttributesBasePtr, false );
 
-                auto attributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto attributesbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(attributes);
-                geoContainer->addEntry("attributes", attributesbasePtr, false);
+                auto attributes = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                auto attributesBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( attributes );
+                geoContainer->addEntry( "attributes", attributesBasePtr, false );
 
-                auto primVars = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto primVarsbasePtr = std::static_pointer_cast<AtomsCore::Metadata>(primVars);
-                geoContainer->addEntry("primVars", primVarsbasePtr, false);
+                auto primVars = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                auto primVarsBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( primVars );
+                geoContainer->addEntry( "primVars", primVarsBasePtr, false );
 
                 AtomsCore::MatrixMetadata mtx;
-                geoContainer->addEntry("matrix", &mtx);
+                geoContainer->addEntry( "matrix", &mtx );
 
                 AtomsCore::MatrixMetadata wmtx;
-                geoContainer->addEntry("worldMatrix", &wmtx);
+                geoContainer->addEntry( "worldMatrix", &wmtx );
 
-                AtomsCore::Vector3 emptyVec(0.0, 0.0, 0.0);
-                AtomsCore::Vector3Metadata pivotMeta(emptyVec);
-                geoContainer->addEntry("pivot", &pivotMeta);
+                AtomsCore::Vector3 emptyVec( 0.0, 0.0, 0.0 );
+                AtomsCore::Vector3Metadata pivotMeta( emptyVec );
+                geoContainer->addEntry( "pivot", &pivotMeta );
 
-                AtomsCore::Vector3Metadata translationMeta(emptyVec);
-                geoContainer->addEntry("translation", &translationMeta);
+                AtomsCore::Vector3Metadata translationMeta( emptyVec );
+                geoContainer->addEntry( "translation", &translationMeta );
 
-                AtomsCore::Vector3 scaleVec(1.0, 1.0, 1.0);
-                AtomsCore::Vector3Metadata scaleMeta(scaleVec);
-                geoContainer->addEntry("scale", &scaleMeta);
+                AtomsCore::Vector3 scaleVec( 1.0, 1.0, 1.0 );
+                AtomsCore::Vector3Metadata scaleMeta( scaleVec );
+                geoContainer->addEntry( "scale", &scaleMeta );
 
-                AtomsCore::Vector3Metadata rotateMeta(emptyVec);
-                geoContainer->addEntry("rotation", &rotateMeta);
+                AtomsCore::Vector3Metadata rotateMeta( emptyVec );
+                geoContainer->addEntry( "rotation", &rotateMeta );
 
                 AtomsCore::IntMetadata rotateOrderMeta;
-                rotateOrderMeta.set(AtomsCore::Euler::XYZ);
-                geoContainer->addEntry("rotationOrder", &rotateOrderMeta);
+                rotateOrderMeta.set( AtomsCore::Euler::XYZ );
+                geoContainer->addEntry( "rotationOrder", &rotateOrderMeta );
 
                 AtomsCore::StringArrayMetadata sets;
-                geoContainer->addEntry("sets", &sets);
+                geoContainer->addEntry( "sets", &sets );
 
-                auto basePtr = std::static_pointer_cast<AtomsCore::Metadata>(it->second);
-                geoContainer->addEntry("geo", basePtr, false);
+                auto basePtr = std::static_pointer_cast<AtomsCore::Metadata>( it->second );
+                geoContainer->addEntry( "geo", basePtr, false );
                 continue;
             }
 
-            if (it->second->typeId() != AtomsCore::MapMetadata::staticTypeId())
-            {
+            if ( it->second->typeId() != AtomsCore::MapMetadata::staticTypeId() ) {
                 continue;
             }
 
-            auto inputGeoMap = std::static_pointer_cast<AtomsCore::MapMetadata>(it->second);
+            auto inputGeoMap = std::static_pointer_cast<AtomsCore::MapMetadata>( it->second );
 
-            auto cloth = inputGeoMap->getTypedEntry<AtomsCore::MeshMetadata>("cloth");
-            if (cloth)
-            {
-                auto clothBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(cloth);
-                inputGeoMap->addEntry("geo", clothBasePtr, false);
-                AtomsCore::BoolMetadata clothFlag(true);
-                inputGeoMap->addEntry("cloth", &clothFlag);
+            auto cloth = inputGeoMap->getTypedEntry<AtomsCore::MeshMetadata>( "cloth" );
+            if ( cloth ) {
+                auto clothBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( cloth );
+                inputGeoMap->addEntry( "geo", clothBasePtr, false );
+                AtomsCore::BoolMetadata clothFlag( true );
+                inputGeoMap->addEntry( "cloth", &clothFlag );
             }
 
-            auto materialAttributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>("material");
-            if (!materialAttributes)
-            {
-                materialAttributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto materialBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(materialAttributes);
-                inputGeoMap->addEntry("material", materialBasePtr, false);
+            auto materialAttributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>( "material" );
+            if ( !materialAttributes ) {
+                materialAttributes = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                auto materialBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( materialAttributes );
+                inputGeoMap->addEntry( "material", materialBasePtr, false );
             }
 
-            swapMapGeoData(inputGeoMap, materialAttributes, "color");
-            swapMapGeoData(inputGeoMap, materialAttributes, "colorTexture");
-            swapMapGeoData(inputGeoMap, materialAttributes, "cosinePower");
-            swapMapGeoData(inputGeoMap, materialAttributes, "specularPower");
-            swapMapGeoData(inputGeoMap, materialAttributes, "specularRollOff");
-            swapMapGeoData(inputGeoMap, materialAttributes, "eccentricity");
-            swapMapGeoData(inputGeoMap, materialAttributes, "specularColor");
-            swapMapGeoData(inputGeoMap, materialAttributes, "specularTexture");
+            swapMapGeoData( inputGeoMap, materialAttributes, "color" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "colorTexture" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "cosinePower" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "specularPower" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "specularRollOff" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "eccentricity" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "specularColor" );
+            swapMapGeoData( inputGeoMap, materialAttributes, "specularTexture" );
 
-            auto attributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>("attributes");
-            if (!attributes)
-            {
+            auto attributes = inputGeoMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+            if ( !attributes ) {
                 attributes = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto attributesBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(attributes);
-                inputGeoMap->addEntry("attributes", attributesBasePtr, false);
+                auto attributesBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( attributes );
+                inputGeoMap->addEntry( "attributes", attributesBasePtr, false );
             }
 
-            swapMapGeoData(inputGeoMap, attributes, "atoms");
-            swapMapGeoData(inputGeoMap, attributes, "arnold");
-            swapMapGeoData(inputGeoMap, attributes, "vray");
-            swapMapGeoData(inputGeoMap, attributes, "renderman");
+            swapMapGeoData( inputGeoMap, attributes, "atoms" );
+            swapMapGeoData( inputGeoMap, attributes, "arnold" );
+            swapMapGeoData( inputGeoMap, attributes, "vray" );
+            swapMapGeoData( inputGeoMap, attributes, "renderman" );
 
-            auto primVars = geoMap->getTypedEntry<AtomsCore::MapMetadata>("primVars");
-            if (!primVars)
-            {
-                primVars = AtomsPtr<AtomsCore::MapMetadata>(new AtomsCore::MapMetadata);
-                auto primVarsBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(primVars);
-                inputGeoMap->addEntry("primVars", primVarsBasePtr, false);
+            auto primVars = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "primVars" );
+            if ( !primVars ) {
+                primVars = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                auto primVarsBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( primVars );
+                inputGeoMap->addEntry( "primVars", primVarsBasePtr, false );
             }
 
-            swapMapGeoData(inputGeoMap, primVars, "xgen_Pref");
-            swapMapGeoData(inputGeoMap, primVars, "__Nref");
-            swapMapGeoData(inputGeoMap, primVars, "__WNref");
-            swapMapGeoData(inputGeoMap, primVars, "__Pref");
-            swapMapGeoData(inputGeoMap, primVars, "__WPref");
+            swapPrimVarData( inputGeoMap, primVars, "xgen_Pref" );
+            swapPrimVarData( inputGeoMap, primVars, "__Nref" );
+            swapPrimVarData( inputGeoMap, primVars, "__WNref" );
+            swapPrimVarData( inputGeoMap, primVars, "__Pref" );
+            swapPrimVarData( inputGeoMap, primVars, "__WPref" );
 
 
             AtomsCore::MatrixMetadata mtx;
-            inputGeoMap->addEntry("matrix", &mtx);
+            inputGeoMap->addEntry( "matrix", &mtx );
 
             AtomsCore::MatrixMetadata wmtx;
-            inputGeoMap->addEntry("worldMatrix", &wmtx);
+            inputGeoMap->addEntry( "worldMatrix", &wmtx );
 
-            AtomsCore::Vector3 emptyVec(0.0, 0.0, 0.0);
-            AtomsCore::Vector3Metadata pivotMeta(emptyVec);
-            inputGeoMap->addEntry("pivot", &pivotMeta);
+            AtomsCore::Vector3 emptyVec( 0.0, 0.0, 0.0 );
+            AtomsCore::Vector3Metadata pivotMeta( emptyVec );
+            inputGeoMap->addEntry( "pivot", &pivotMeta );
 
-            AtomsCore::Vector3Metadata translationMeta(emptyVec);
-            inputGeoMap->addEntry("translation", &translationMeta);
+            AtomsCore::Vector3Metadata translationMeta( emptyVec );
+            inputGeoMap->addEntry( "translation", &translationMeta );
 
-            AtomsCore::Vector3 scaleVec(1.0, 1.0, 1.0);
-            AtomsCore::Vector3Metadata scaleMeta(scaleVec);
-            inputGeoMap->addEntry("scale", &scaleMeta);
+            AtomsCore::Vector3 scaleVec( 1.0, 1.0, 1.0 );
+            AtomsCore::Vector3Metadata scaleMeta( scaleVec );
+            inputGeoMap->addEntry( "scale", &scaleMeta );
 
-            AtomsCore::Vector3Metadata rotateMeta(emptyVec);
-            inputGeoMap->addEntry("rotation", &rotateMeta);
+            AtomsCore::Vector3Metadata rotateMeta( emptyVec );
+            inputGeoMap->addEntry( "rotation", &rotateMeta );
 
             AtomsCore::IntMetadata rotateOrderMeta;
-            rotateOrderMeta.set(AtomsCore::Euler::XYZ);
-            inputGeoMap->addEntry("rotationOrder", &rotateOrderMeta);
+            rotateOrderMeta.set( AtomsCore::Euler::XYZ );
+            inputGeoMap->addEntry( "rotationOrder", &rotateOrderMeta );
 
             AtomsCore::StringArrayMetadata sets;
-            inputGeoMap->addEntry("sets", &sets);
+            inputGeoMap->addEntry( "sets", &sets );
 
-            auto inputGeoMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>(inputGeoMap);
-            childrenMap->addEntry(it->first, inputGeoMapBasePtr, false);
+            auto inputGeoMapBasePtr = std::static_pointer_cast<AtomsCore::Metadata>( inputGeoMap );
+            childrenMap->addEntry( it->first, inputGeoMapBasePtr, false );
         }
 
         return geoMap;
@@ -601,7 +641,8 @@ public :
             auto inGeoMap = Atoms::loadMesh( geoPtr->getGeometryFile(), geoPtr->getGeometryFilter() );
             if ( !inGeoMap )
             {
-                throw InvalidArgumentException( "AtomsVariationsReader: Invalid geo: " + geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter() );
+                throw InvalidArgumentException( "AtomsVariationsReader: Invalid geo: " +
+                geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter() );
             }
 
             auto* agentTypeRoot = &m_root.children[agentTypeName];
@@ -692,16 +733,12 @@ public :
             std::vector<std::string>& paths,
             const std::string& currentPath ) const
     {
-        if ( node->data )
-        {
+        if ( node->data ) {
             auto sets = node->data->getTypedEntry<const AtomsCore::StringArrayMetadata>( "sets" );
-            if ( sets )
-            {
+            if ( sets ) {
                 auto& setVec = sets->get();
-                for ( auto& currentSet: setVec )
-                {
-                    if ( currentSet == setName )
-                    {
+                for ( auto& currentSet: setVec ) {
+                    if ( currentSet == setName ) {
                         for ( auto& variation: node->variations )
                             paths.push_back( variation + "/" + currentPath );
                         break;
@@ -709,8 +746,8 @@ public :
                 }
             }
         }
-        for ( auto it = node->children.cbegin(); it != node->children.cend(); ++it )
-        {
+
+        for ( auto it = node->children.cbegin(); it != node->children.cend(); ++it ) {
             collectAllPathFromSetName( setName, &it->second, paths, currentPath + "/" + it->first );
         }
     }
@@ -888,12 +925,14 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
                 }
                 else
                 {
-                    throw InvalidArgumentException( "AtomsVariationsReader: No bound found for " + geoData->getGeometryFile() + ":" + geoData->getGeometryFilter() );
+                    throw InvalidArgumentException( "AtomsVariationsReader: No bound found for " +
+                    geoData->getGeometryFile() + ":" + geoData->getGeometryFilter() );
                 }
             }
             else
             {
-                throw InvalidArgumentException( "AtomsVariationsReader: No valid geo found " + geoData->getGeometryFile() + ":" + geoData->getGeometryFilter() );
+                throw InvalidArgumentException( "AtomsVariationsReader: No valid geo found " +
+                geoData->getGeometryFile() + ":" + geoData->getGeometryFilter() );
             }
         }
     }
@@ -901,7 +940,8 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
     return unionOfTransformedChildBounds( path, parent );
 }
 
-void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
+void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::Context *context,
+        const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashTransform( path, context, parent, h );
     atomsVariationFilePlug()->hash( h );
@@ -1011,18 +1051,22 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
         if ( dagNodeMap )
         {
             auto attributesMap = dagNodeMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
-            if ( attributesMap ) {
+            if ( attributesMap )
+            {
                 CompoundObjectPtr result = new CompoundObject;
                 for (auto attrIt = attributesMap->cbegin(); attrIt != attributesMap->cend(); ++attrIt)
                 {
-                    if (attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman")
+                    if ( attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman" )
                         continue;
-                    auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>(attrIt->second);
-                    if (atomsAttributeMap) {
-                        for (auto meshAttrIt = atomsAttributeMap->cbegin();
-                             meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
-                            auto data = translator.translate(meshAttrIt->second);
-                            if (data) {
+                    auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>( attrIt->second );
+                    if ( atomsAttributeMap )
+                    {
+                        for ( auto meshAttrIt = atomsAttributeMap->cbegin();
+                             meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt )
+                        {
+                            auto data = translator.translate( meshAttrIt->second );
+                            if (data)
+                            {
                                 result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
                             }
                         }
@@ -1071,8 +1115,8 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
             continue;
 
         // Store the skin data as attributes
-        auto jointWeightsAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>("jointWeights");
-        auto jointIndicesAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>("jointIndices");
+        auto jointWeightsAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointWeights" );
+        auto jointIndicesAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointIndices" );
         if ( jointWeightsAttr && jointIndicesAttr && jointWeightsAttr->size() == jointIndicesAttr->size() )
         {
             for( size_t wId = 0; wId < jointWeightsAttr->size(); ++wId )
@@ -1084,8 +1128,8 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                     continue;
 
                 indexCount.push_back( jointIndices->get().size() );
-                indices.insert(indices.end(), jointIndices->get().begin(), jointIndices->get().end());
-                weights.insert(weights.end(), jointWeights->get().begin(), jointWeights->get().end());
+                indices.insert( indices.end(), jointIndices->get().begin(), jointIndices->get().end() );
+                weights.insert( weights.end(), jointWeights->get().begin(), jointWeights->get().end() );
             }
         }
 
@@ -1095,50 +1139,50 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
         if ( attributesMap ) {
             for (auto attrIt = attributesMap->cbegin(); attrIt != attributesMap->cend(); ++attrIt)
             {
-                if (attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman")
+                if ( attrIt->first == "arnold" || attrIt->first == "vray" || attrIt->first == "renderman" )
                     continue;
-                auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>(attrIt->second);
-                if (atomsAttributeMap) {
-                    for (auto meshAttrIt = atomsAttributeMap->cbegin();
-                         meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
-                        auto data = translator.translate(meshAttrIt->second);
-                        if (data) {
+                auto atomsAttributeMap = std::dynamic_pointer_cast<const AtomsCore::MapMetadata>( attrIt->second );
+                if ( atomsAttributeMap ) {
+                    for ( auto meshAttrIt = atomsAttributeMap->cbegin();
+                         meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt ) {
+                        auto data = translator.translate( meshAttrIt->second );
+                        if ( data ) {
                             result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
                         }
                     }
                 }
             }
             // Convert the arnold metadata to gaffer attribute
-            auto atomsAttributeMap = geoMap->getTypedEntry<AtomsCore::MapMetadata>("arnold");
-            if (!atomsAttributeMap) {
+            auto atomsAttributeMap = attributesMap->getTypedEntry<AtomsCore::MapMetadata>( "arnold" );
+            if ( !atomsAttributeMap ) {
                 continue;
             }
 
-            for (auto meshAttrIt = atomsAttributeMap->cbegin(); meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt) {
-                auto data = translator.translate(meshAttrIt->second);
+            for ( auto meshAttrIt = atomsAttributeMap->cbegin(); meshAttrIt != atomsAttributeMap->cend(); ++meshAttrIt ) {
+                auto data = translator.translate( meshAttrIt->second );
                 if (!data) {
                     continue;
                 }
 
                 // Convert the arnold visible_in_* attribute to ai:visibility:*
                 std::string aiParameter = meshAttrIt->first;
-                auto visIndex = meshAttrIt->first.find("visible_in_");
+                auto visIndex = meshAttrIt->first.find( "visible_in_" );
                 bool handleParam = false;
-                if (visIndex != std::string::npos) {
-                    aiParameter = "visibility:" + meshAttrIt->first.substr(visIndex + 11);
+                if ( visIndex != std::string::npos ) {
+                    aiParameter = "visibility:" + meshAttrIt->first.substr( visIndex + 11 );
                     handleParam = true;
                 }
 
                 // Convert the arnold subdiv* attribute to ai:polymesh:*
-                visIndex = meshAttrIt->first.find("subdiv");
-                if (visIndex != std::string::npos) {
+                visIndex = meshAttrIt->first.find( "subdiv" );
+                if ( visIndex != std::string::npos ) {
                     aiParameter = "polymesh:" + meshAttrIt->first;
                     handleParam = true;
                 }
 
                 // Sett only polymesh arnold attributes
-                if (handleParam ||
-                    (meshAttrIt->first == "sidedness" ||
+                if ( handleParam ||
+                    ( meshAttrIt->first == "sidedness" ||
                      meshAttrIt->first == "receive_shadows" ||
                      meshAttrIt->first == "self_shadows" ||
                      meshAttrIt->first == "invert_normals" ||
@@ -1147,16 +1191,16 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                      meshAttrIt->first == "smoothing"
                     )
                         ) {
-                    switch (data->typeId()) {
+                    switch ( data->typeId() ) {
                         case IECore::TypeId::DoubleDataTypeId: {
                             FloatDataPtr fData = new FloatData;
-                            fData->writable() = runTimeCast<const DoubleData>(data)->readable();
+                            fData->writable() = runTimeCast<const DoubleData>( data )->readable();
                             result->members()["ai:" + aiParameter] = fData;
                             break;
                         }
                         case IECore::TypeId::V3dDataTypeId: {
                             V3fDataPtr fData = new V3fData;
-                            fData->writable() = Imath::V3f(runTimeCast<const V3dData>(data)->readable());
+                            fData->writable() = Imath::V3f( runTimeCast<const V3dData>( data )->readable() );
                             result->members()["ai:" + aiParameter] = fData;
                             break;
                         }
@@ -1180,7 +1224,8 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
     return result;
 }
 
-void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
+void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Context *context,
+        const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashObject( path, context, parent, h );
     atomsVariationFilePlug()->hash( h );
@@ -1190,7 +1235,8 @@ void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Cont
 	h.append( &path.front(), path.size() );
 }
 
-IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent ) const
+IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &path,
+        const Gaffer::Context *context, const ScenePlug *parent ) const
 {
 
 	if( path.size() < 3 )
@@ -1242,11 +1288,9 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
 
     auto atomsGeo = geoCacheMeshIt->second;
     AtomsPtr<AtomsCore::MapMetadata> outGeoMap( new AtomsCore::MapMetadata );
-    AtomsPtr<AtomsCore::MeshMetadata> outMeshMeta( new AtomsCore::MeshMetadata );
-    AtomsPtr<AtomsCore::ArrayMetadata> outBlendMeta( new AtomsCore::ArrayMetadata );
-    AtomsUtils::Mesh& mesh = outMeshMeta->get();
 
     // A single .geos file could contain multiple mesh, se we need to merge those mesh together
+    std::vector<AtomsPtr<AtomsCore::MapMetadata>> inGeosMap;
     for ( auto meshIt = atomsGeo->begin(); meshIt!= atomsGeo->end(); ++meshIt )
     {
         if ( meshIt->first == "boundingBox" )
@@ -1256,22 +1300,24 @@ IECore::ConstObjectPtr AtomsVariationReader::computeObject( const ScenePath &pat
         if ( !geoMap )
             continue;
 
-        mergeAtomsMesh( geoMap, outGeoMap, outMeshMeta, outBlendMeta );
+        inGeosMap.push_back( geoMap );
     }
 
-    if ( outBlendMeta->size() > 0 )
+    if ( inGeosMap.size() == 0 )
+        return parent->objectPlug()->defaultValue();
+
+    if (inGeosMap.size() == 1)
     {
-        AtomsPtr<AtomsCore::Metadata> outBlendMeshMeta = std::static_pointer_cast<AtomsCore::Metadata>( outBlendMeta );
-        outGeoMap->addEntry( "blendShapes" , outBlendMeshMeta, false);
+        return convertAtomsMesh( inGeosMap[0], generatePrefPlug()->getValue(),  generateNrefPlug()->getValue() );
     }
 
-    AtomsPtr<AtomsCore::Metadata> outMeshMetaPtr = std::static_pointer_cast<AtomsCore::Metadata>( outMeshMeta );
-    outGeoMap->addEntry( "geo" , outMeshMetaPtr, false);
-
+    inGeosMap.push_back(inGeosMap.back());
+    mergeAtomsMesh( outGeoMap, inGeosMap );
     return convertAtomsMesh( outGeoMap, generatePrefPlug()->getValue(),  generateNrefPlug()->getValue() );
 }
 
-void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
+void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::Context *context,
+        const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashChildNames( path, context, parent, h );
     atomsVariationFilePlug()->hash( h );
@@ -1279,7 +1325,8 @@ void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::
 	h.append( &path.front(), path.size() );
 }
 
-IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent ) const
+IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeChildNames( const ScenePath &path,
+        const Gaffer::Context *context, const ScenePlug *parent ) const
 {
     InternedStringVectorDataPtr resultData = new InternedStringVectorData;
 	std::vector<InternedString> &result = resultData->writable();
@@ -1400,7 +1447,8 @@ IECore::ConstInternedStringVectorDataPtr AtomsVariationReader::computeSetNames( 
 	return resultData;
 }
 
-void AtomsVariationReader::hashSet( const IECore::InternedString &setName, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
+void AtomsVariationReader::hashSet( const IECore::InternedString &setName, const Gaffer::Context *context,
+        const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashSet( setName, context, parent, h );
 
@@ -1409,7 +1457,8 @@ void AtomsVariationReader::hashSet( const IECore::InternedString &setName, const
 	h.append( setName );
 }
 
-IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::InternedString &setName, const Gaffer::Context *context, const ScenePlug *parent ) const
+IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::InternedString &setName,
+        const Gaffer::Context *context, const ScenePlug *parent ) const
 {
     PathMatcherDataPtr resultData = new PathMatcherData;
     ConstEngineDataPtr engineData = static_pointer_cast<const EngineData>( enginePlug()->getValue() );
@@ -1604,130 +1653,306 @@ void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh
     }
 }
 
-void AtomsVariationReader::mergeAtomsMesh(
+void AtomsVariationReader::mergeBlendShapes(
         AtomsPtr<AtomsCore::MapMetadata>& geoMap,
-        AtomsPtr<AtomsCore::MapMetadata>& outGeoMap,
-        AtomsPtr<AtomsCore::MeshMetadata>& outMeshMeta,
-        AtomsPtr<AtomsCore::ArrayMetadata>& outBlendMeta
-    ) const
+        AtomsPtr<AtomsCore::ArrayMetadata>& outBlendMeta,
+        AtomsUtils::Mesh &inMesh,
+        size_t pointSize,
+        size_t normalSize ) const
 {
-    auto meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
-    if ( !meshMeta )
-    {
-        meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "cloth" );
-        if (!meshMeta)
-        {
-            return;
-        }
-    }
-
-    AtomsUtils::Mesh& mesh = outMeshMeta->get();
-    AtomsUtils::Mesh& inMesh = meshMeta->get();
-    size_t currentPointsSize = mesh.points().size();
-    size_t currentNormalsSize = mesh.normals().size();
-    size_t currentIndicesSize = mesh.indices().size();
-
-    if ( mesh.uvs().size() < currentIndicesSize )
-    {
-        mesh.uvs().resize( currentIndicesSize );
-    }
-
-    mesh.points().insert( mesh.points().end(), inMesh.points().begin(), inMesh.points().end() );
-    mesh.normals().insert( mesh.normals().end(), inMesh.normals().begin(), inMesh.normals().end() );
-    mesh.vertexCount().insert( mesh.vertexCount().end(), inMesh.vertexCount().begin(), inMesh.vertexCount().end() );
-    mesh.jointIndices().insert( mesh.jointIndices().end(), inMesh.jointIndices().begin(), inMesh.jointIndices().end() );
-    mesh.jointWeights().insert( mesh.jointWeights().end(), inMesh.jointWeights().begin(), inMesh.jointWeights().end() );
-
-
-    auto& inIndices = inMesh.indices();
-    auto& outIndices = mesh.indices();
-    outIndices.resize( currentIndicesSize + inIndices.size() );
-    for (size_t id = 0; id < inIndices.size(); ++id)
-    {
-        outIndices[ currentIndicesSize + id]  = inIndices[id] + currentPointsSize;
-    }
-
-    auto& outUV = mesh.uvs();
-    outUV.insert( outUV.end(), inMesh.uvs().begin(), inMesh.uvs().end() );
-    if ( outUV.size() < mesh.normals().size() )
-    {
-        outUV.resize( mesh.normals().size() );
-    }
-
-    // Merge the uv sets
-    mergeUvSets( mesh, inMesh, currentNormalsSize );
+    auto outMeshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
+    AtomsUtils::Mesh &mesh = outMeshMeta->get();
 
     // Merge the blend shapes
     auto blendShapes = geoMap->getTypedEntry<const AtomsCore::ArrayMetadata>("blendShapes");
-    if ( !( blendShapes && blendShapes->size() > 0 ) )
-    {
+    if (!(blendShapes && blendShapes->size() > 0)) {
         return;
     }
 
     // Add missing blend shapes
-    for ( unsigned int blendId = outBlendMeta->size(); blendId < blendShapes->size(); blendId++ )
-    {
+    for ( unsigned int blendId = outBlendMeta->size(); blendId < blendShapes->size(); blendId++ ) {
         AtomsCore::MapMetadata blendData;
         AtomsCore::Vector3ArrayMetadata emptyVec;
-        blendData.addEntry( "P", &emptyVec );
-        blendData.addEntry( "N", &emptyVec );
-        outBlendMeta->push_back( &blendData );
+        blendData.addEntry("P", &emptyVec);
+        blendData.addEntry("N", &emptyVec);
+        outBlendMeta->push_back(&blendData);
     }
 
-    for ( unsigned int blendId = 0; blendId < blendShapes->size(); blendId++ )
-    {
+    for ( unsigned int blendId = 0; blendId < blendShapes->size(); blendId++ ) {
         auto blendMap = blendShapes->getTypedElement<AtomsCore::MapMetadata>( blendId );
         if (!blendMap)
             continue;
 
         auto blendPoints = blendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>( "P" );
-        auto& blendP = blendPoints->get();
+        auto &blendP = blendPoints->get();
 
         auto blendNormals = blendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>( "N" );
-        auto& blendN = blendNormals->get();
+        auto &blendN = blendNormals->get();
 
 
-        auto outBlendMap = outBlendMeta->getTypedElement<AtomsCore::MapMetadata>( blendId );
+        auto outBlendMap = outBlendMeta->getTypedElement<AtomsCore::MapMetadata>(blendId);
         if (!outBlendMap)
             continue;
 
-        auto outBlendPoints = outBlendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>( "P" );
-        auto& outP = outBlendPoints->get();
-        if ( outP.size() <  currentPointsSize )
-        {
+        auto outBlendPoints = outBlendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>("P");
+        auto &outP = outBlendPoints->get();
+        if (outP.size() < pointSize) {
             size_t currentSize = outP.size();
-            outP.resize(currentPointsSize);
-            for (size_t pbId = currentSize; pbId < currentPointsSize; ++pbId)
-            {
+            outP.resize(pointSize);
+            for (size_t pbId = currentSize; pbId < pointSize; ++pbId) {
                 outP[pbId] = mesh.points()[pbId];
             }
         }
 
-        outP.insert( outP.begin(), blendP.begin(), blendP.end() );
+        outP.insert(outP.begin(), blendP.begin(), blendP.end());
 
-        auto outBlendNormals = outBlendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>( "N" );
-        auto& outN = outBlendNormals->get();
-        if ( outN.size() <  currentPointsSize )
-        {
+        auto outBlendNormals = outBlendMap->getTypedEntry<AtomsCore::Vector3ArrayMetadata>("N");
+        auto &outN = outBlendNormals->get();
+        if (outN.size() < normalSize) {
             size_t currentSize = outN.size();
-            outN.resize(currentNormalsSize);
-            for (size_t pbId = currentSize; pbId < currentNormalsSize; ++pbId)
-            {
+            outN.resize(normalSize);
+            for (size_t pbId = currentSize; pbId < normalSize; ++pbId) {
                 outN[pbId] = mesh.normals()[pbId];
             }
         }
 
-        if ( blendN.size() == inMesh.indices().size() )
-        {
-            outN.insert( outN.begin(), blendN.begin(), blendN.end() );
-        }
-        else
-        {
+        if (blendN.size() == inMesh.indices().size()) {
+            outN.insert(outN.begin(), blendN.begin(), blendN.end());
+        } else {
             // convert normals from vertex to face varying
-            outN.resize( outN.size() + inMesh.indices().size() );
-            for ( size_t vId = 0; vId < std::min(inMesh.indices().size(), blendN.size()); ++vId )
-            {
+            outN.resize(outN.size() + inMesh.indices().size());
+            for (size_t vId = 0; vId < std::min(inMesh.indices().size(), blendN.size()); ++vId) {
                 outN[vId] = blendN[inMesh.indices()[vId]];
+            }
+        }
+    }
+}
+
+template<typename T>
+void mergeAtomsPrimVariableData(
+        AtomsPtr<AtomsCore::MapMetadata>& outPrimVar,
+        const std::string& interpolationType,
+        AtomsUtils::Mesh& mesh,
+        AtomsPtr<AtomsCore::TypedArrayMetadata<T>>& inVectorData)
+{
+    auto vectorData = outPrimVar->getTypedEntry<AtomsCore::TypedArrayMetadata<T>>( "data" );
+    if ( !vectorData )
+    {
+        vectorData = AtomsPtr<AtomsCore::TypedArrayMetadata<T>>( new AtomsCore::TypedArrayMetadata<T> );
+        auto vectorDataPtr = std::static_pointer_cast<AtomsCore::Metadata>( vectorData );
+        outPrimVar->addEntry( "data", vectorDataPtr, false );
+    }
+
+
+    size_t startSize = 0;
+    if (interpolationType == "uniform") {
+        startSize = mesh.numberOfFaces() - inVectorData->get().size();
+    } else if (interpolationType == "vertex") {
+        startSize = mesh.numberOfVertices() - inVectorData->get().size();
+    } else if (interpolationType == "varying") {
+        startSize = mesh.numberOfVertices() - inVectorData->get().size();
+    } else if (interpolationType == "faceVarying") {
+        startSize = mesh.indices().size() - inVectorData->get().size();
+    }
+
+    if ( vectorData->get().size() < startSize)
+    {
+        vectorData->get().resize(startSize);
+    }
+    vectorData->get().insert(
+            vectorData->get().end(),
+            inVectorData->get().begin(),
+            inVectorData->get().end()
+    );
+}
+
+void AtomsVariationReader::mergeAtomsMesh(
+        AtomsPtr<AtomsCore::MapMetadata>& outGeoMap,
+        std::vector<AtomsPtr<AtomsCore::MapMetadata>>& geos
+) const
+{
+    auto outMeshMeta = outGeoMap->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
+    if ( !outMeshMeta ) {
+        outMeshMeta = AtomsPtr<AtomsCore::MeshMetadata>( new AtomsCore::MeshMetadata );
+        auto outMeshMetaPtr = std::static_pointer_cast<AtomsCore::Metadata>( outMeshMeta );
+        outGeoMap->addEntry( "geo", outMeshMetaPtr, false);
+    }
+
+    auto outBlendMeta = outGeoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "blendShapes" );
+    if ( !outBlendMeta ) {
+        outBlendMeta = AtomsPtr<AtomsCore::ArrayMetadata>( new AtomsCore::ArrayMetadata );
+        auto outBlendMetaPtr = std::static_pointer_cast<AtomsCore::Metadata>( outBlendMeta );
+        outGeoMap->addEntry( "blendShapes", outBlendMetaPtr, false);
+    }
+
+    auto outAttributes = outGeoMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+    if ( !outAttributes ) {
+        outAttributes = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+        auto outAttributesPtr = std::static_pointer_cast<AtomsCore::Metadata>( outAttributes );
+        outGeoMap->addEntry( "attributes", outAttributesPtr, false);
+    }
+
+    auto outPrimVars = outGeoMap->getTypedEntry<AtomsCore::MapMetadata>( "primVars" );
+    if ( !outPrimVars ) {
+        outPrimVars = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+        auto outPrimVarsPtr = std::static_pointer_cast<AtomsCore::Metadata>( outPrimVars );
+        outGeoMap->addEntry( "primVars", outPrimVarsPtr, false);
+    }
+
+    auto outJointWeightsAttr = outGeoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointWeights" );
+    if ( !outJointWeightsAttr ) {
+        outJointWeightsAttr = AtomsPtr<AtomsCore::ArrayMetadata>( new AtomsCore::ArrayMetadata );
+        auto outJointWeightsAttrPtr = std::static_pointer_cast<AtomsCore::Metadata>( outJointWeightsAttr );
+        outGeoMap->addEntry( "jointWeights", outJointWeightsAttrPtr, false);
+    }
+
+    auto outJointIndicesAttr = outGeoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointIndices" );
+    if ( !outJointIndicesAttr ) {
+        outJointIndicesAttr = AtomsPtr<AtomsCore::ArrayMetadata>( new AtomsCore::ArrayMetadata );
+        auto outJointIndicesAttrPtr = std::static_pointer_cast<AtomsCore::Metadata>( outJointIndicesAttr );
+        outGeoMap->addEntry( "jointIndices", outJointIndicesAttrPtr, false);
+    }
+
+
+    for (auto geoId = 0; geoId < geos.size(); ++geoId) {
+        auto geoMap = geos[geoId];
+        auto meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "geo" );
+        if (!meshMeta) {
+            meshMeta = geoMap->getTypedEntry<AtomsCore::MeshMetadata>( "cloth" );
+            if (!meshMeta) {
+                continue;
+            }
+        }
+
+
+        AtomsUtils::Mesh &mesh = outMeshMeta->get();
+        AtomsUtils::Mesh &inMesh = meshMeta->get();
+        size_t currentPointsSize = mesh.points().size();
+        size_t currentNormalsSize = mesh.normals().size();
+        size_t currentIndicesSize = mesh.indices().size();
+
+        if (mesh.uvs().size() < currentIndicesSize) {
+            mesh.uvs().resize(currentIndicesSize);
+        }
+
+        mesh.points().insert(mesh.points().end(), inMesh.points().begin(), inMesh.points().end());
+        mesh.normals().insert(mesh.normals().end(), inMesh.normals().begin(), inMesh.normals().end());
+        mesh.vertexCount().insert(mesh.vertexCount().end(), inMesh.vertexCount().begin(), inMesh.vertexCount().end());
+        mesh.jointIndices().insert(mesh.jointIndices().end(), inMesh.jointIndices().begin(),
+                                   inMesh.jointIndices().end());
+        mesh.jointWeights().insert(mesh.jointWeights().end(), inMesh.jointWeights().begin(),
+                                   inMesh.jointWeights().end());
+
+        auto &inIndices = inMesh.indices();
+        auto &outIndices = mesh.indices();
+        outIndices.resize(currentIndicesSize + inIndices.size());
+        for (size_t id = 0; id < inIndices.size(); ++id) {
+            outIndices[currentIndicesSize + id] = inIndices[id] + currentPointsSize;
+        }
+
+        auto &outUV = mesh.uvs();
+        outUV.insert(outUV.end(), inMesh.uvs().begin(), inMesh.uvs().end());
+        if (outUV.size() < mesh.normals().size()) {
+            outUV.resize(mesh.normals().size());
+        }
+
+        // Merge the uv sets
+        mergeUvSets(mesh, inMesh, currentNormalsSize);
+        mergeBlendShapes(
+                geoMap,
+                outBlendMeta,
+                inMesh,
+                currentPointsSize,
+                currentNormalsSize );
+
+
+        auto jointWeightsAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointWeights" );
+        if ( jointWeightsAttr )
+        {
+            for ( auto jwIt = 0; jwIt < jointWeightsAttr->size(); ++jwIt )
+                outJointWeightsAttr->push_back( jointWeightsAttr->operator[]( jwIt ) );
+        }
+
+        auto jointIndicesAttr = geoMap->getTypedEntry<AtomsCore::ArrayMetadata>( "jointIndices" );
+        if ( jointIndicesAttr )
+        {
+            for ( auto jwIt = 0; jwIt < jointIndicesAttr->size(); ++jwIt )
+                outJointIndicesAttr->push_back( jointIndicesAttr->operator[]( jwIt ) );
+        }
+
+        // merge attributes
+        auto inAttributes = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+        {
+            for ( auto attrContainerIt = inAttributes->begin(); attrContainerIt != inAttributes->cend(); ++attrContainerIt )
+            {
+                auto outAttrContainer = outAttributes->getTypedEntry<AtomsCore::MapMetadata>( attrContainerIt->first );
+                if ( !outAttrContainer )
+                {
+                    outAttrContainer = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                    auto outAttrContainerPtr = std::static_pointer_cast<AtomsCore::Metadata>( outAttrContainer );
+                    outAttributes->addEntry( attrContainerIt->first, outAttrContainerPtr, false );
+                }
+
+                auto inAttrContainer = std::static_pointer_cast<AtomsCore::MapMetadata>( attrContainerIt->second );
+
+                for ( auto attrIt = inAttrContainer->begin(); attrIt != inAttrContainer->cend(); ++attrIt )
+                {
+                    outAttrContainer->addEntry( attrIt->first, attrIt->second );
+                }
+            }
+        }
+
+        // merge primvars
+        auto inPrimVars = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "primVars" );
+        {
+            for ( auto primVarIt = inPrimVars->begin(); primVarIt != inPrimVars->cend(); ++primVarIt )
+            {
+                if ( primVarIt->second->typeId() != AtomsCore::MapMetadata::staticTypeId() )
+                    continue;
+
+                auto primVarMap = std::static_pointer_cast<AtomsCore::MapMetadata>( primVarIt->second );
+                auto interpolationPtr = primVarMap->getTypedEntry<AtomsCore::StringMetadata>( "interpolation" );
+                if ( !interpolationPtr )
+                    continue;
+
+                if (interpolationPtr->get() == "constant") {
+                    outPrimVars->addEntry(primVarIt->first, primVarIt->second);
+                    continue;
+                }
+
+                auto outPrimVar = outPrimVars->getTypedEntry<AtomsCore::MapMetadata>( primVarIt->first );
+                if ( !outPrimVar )
+                {
+                    outPrimVar = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
+                    outPrimVar->addEntry( "interpolation", interpolationPtr);
+                    auto outPrimVarPtr = std::static_pointer_cast<AtomsCore::Metadata>( outPrimVar );
+                    outPrimVars->addEntry(primVarIt->first, outPrimVarPtr, false);
+
+                }
+
+
+                switch ( primVarIt->second->typeId() ) {
+                    case kMetadataIntArrayTypeId: {
+                        auto inVectorData = std::static_pointer_cast<AtomsCore::IntArrayMetadata>( primVarIt->second );
+                        mergeAtomsPrimVariableData( outPrimVar, interpolationPtr->get(), mesh, inVectorData );
+                        break;
+                    }
+                    case kMetadataDoubleArrayTypeId: {
+                        auto inVectorData = std::static_pointer_cast<AtomsCore::DoubleArrayMetadata>( primVarIt->second );
+                        mergeAtomsPrimVariableData( outPrimVar, interpolationPtr->get(), mesh, inVectorData );
+                        break;
+                    }
+                    case kMetadataVector3ArrayTypeId: {
+                        auto inVectorData = std::static_pointer_cast<AtomsCore::Vector3ArrayMetadata>( primVarIt->second );
+                        mergeAtomsPrimVariableData( outPrimVar, interpolationPtr->get(), mesh, inVectorData );
+                        break;
+                    }
+                    case kMetadataBoolArrayTypeId: {
+                        auto inVectorData = std::static_pointer_cast<AtomsCore::BoolArrayMetadata>( primVarIt->second );
+                        mergeAtomsPrimVariableData( outPrimVar, interpolationPtr->get(), mesh, inVectorData );
+                        break;
+                    }
+                }
             }
         }
     }

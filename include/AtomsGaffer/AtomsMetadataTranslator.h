@@ -52,11 +52,11 @@ class AtomsMetadataTranslator
 
     public:
 
-        typedef IECore::DataPtr( *Translator )( const AtomsPtr<AtomsCore::Metadata>& );
+        typedef IECore::DataPtr( *Translator )( const AtomsPtr<const AtomsCore::Metadata>& );
 
         static AtomsMetadataTranslator& instance();
 
-        IECore::DataPtr translate( const AtomsPtr<AtomsCore::Metadata>& metadata );
+        IECore::DataPtr translate( const AtomsPtr<const AtomsCore::Metadata>& metadata ) const;
 
     private:
 

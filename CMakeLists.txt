@@ -6,10 +6,6 @@ option( USE_GAFFER_DEPENDENCIES "Turn this off you're building against your own 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
 
-set(ATOMS_ROOT /home/alan/projects/atomscrowd/deployGaffer)
-set(GAFFER_ROOT /home/alan/projects/gafferDependency/deploy_53)
-set(CMAKE_INSTALL_PREFIX /home/alan/projects/atomsGaffer/deploy)
-
 if(ATOMS_MAYA_ROOT)
     set(ATOMS_INCLUDE_PATH ${ATOMS_MAYA_ROOT}/include)
     set(ATOMS_LIB_PATH ${ATOMS_MAYA_ROOT}/lib/2018)

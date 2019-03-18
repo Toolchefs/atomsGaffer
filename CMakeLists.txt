@@ -2,6 +2,7 @@ cmake_minimum_required(VERSION 3.0)
 project(AtomsGaffer)
 
 option( USE_GAFFER_DEPENDENCIES "Turn this off you're building against your own dependencies (eg boost, python, tbb, exr, cortex) rather than the versions included with Gaffer" ON )
+option( USE_ATOMS_PROCEDURAL "Turn this off you plan to load AtomsGaffer in maya or another environment that requires a full atoms license" ON )
 
 set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE OFF)
@@ -42,7 +43,11 @@ link_directories( AtomsGaffer ${GAFFER_ROOT}/lib ${ATOMS_LIB_PATH} )
 add_library( AtomsGaffer SHARED ${AtomsGafferSrc} )
 target_compile_definitions( AtomsGaffer PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
 target_include_directories( AtomsGaffer PRIVATE include ${DEPENDENCY_INCLUDE_PATHS} )
-target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsProcedural )
+if(USE_ATOMS_PROCEDURAL)
+	target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsProcedural )
+else()
+	target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsCore AtomsGraph Atoms AtomsUtils )
+endif()
 install( TARGETS AtomsGaffer DESTINATION lib )
 
 # build the python bindings

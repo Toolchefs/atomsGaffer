@@ -1,0 +1,27 @@
+### ATOMS: pole_material
+### exported: Fri Mar 29 16:11:20 2019
+### from:     Arnold 5.2.1.0 [7c7c9701] linux clang-5.0.0 oiio-1.7.17 osl-1.9.9 vdb-4.0.0 clm-1.0.3.513 rlm-12.4.2 2018/10/19 22:25:43
+### host app: MtoA 3.1.1 5d19efb6 (master) Maya 2018
+### user: alan
+### render_layer: rs_Robot1
+### scene: /home/alan/projects/atomsDemo/scenes/AtomsRobotForGaffer.ma
+
+
+
+standard_surface
+{
+ name pole_material
+ base_color 0.169270828 0.169270828 0.169270828
+ specular 1
+ specular_color 0.5 0.5 0.5
+ specular_roughness 0.28355819
+ specular_IOR 3
+ coat 0.5
+ coat_color 0 0 0
+ coat_roughness 0
+ coat_IOR 3
+ emission 1
+ emission_color 0 0 0
+ opacity 1 1 1
+}
+

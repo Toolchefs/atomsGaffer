@@ -1,0 +1,44 @@
+### ATOMS: robot1_material
+### exported: Fri Mar 29 16:11:18 2019
+### from:     Arnold 5.2.1.0 [7c7c9701] linux clang-5.0.0 oiio-1.7.17 osl-1.9.9 vdb-4.0.0 clm-1.0.3.513 rlm-12.4.2 2018/10/19 22:25:43
+### host app: MtoA 3.1.1 5d19efb6 (master) Maya 2018
+### user: alan
+### render_layer: rs_Robot1
+### scene: /home/alan/projects/atomsDemo/scenes/AtomsRobotForGaffer.ma
+
+
+
+standard_surface
+{
+ name robot1_material
+ base_color robot2_file
+ specular 1
+ specular_color 0.5 0.5 0.5
+ specular_roughness 0.28355819
+ specular_IOR 3
+ coat 0.5
+ coat_color 0 0 0
+ coat_roughness 0
+ coat_IOR 3
+ emission 1
+ emission_color 0 0 0
+ opacity 1 1 1
+}
+
+image
+{
+ name robot2_file
+ filename "/home/alan/projects/atomscrowd/deploy/data/robot1_diffuse.jpg"
+ color_space ""
+ filter "smart_bicubic"
+ swrap "periodic"
+ twrap "periodic"
+ sscale 1
+ tscale 1
+ soffset 0
+ toffset 0
+ uvset ""
+ ignore_missing_textures on
+ missing_texture_color 0.5 0.5 0.5 0
+}
+

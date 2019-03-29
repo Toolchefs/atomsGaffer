@@ -92,12 +92,12 @@ IECoreScene::PrimitiveVariable convertUvs( AtomsUtils::Mesh& mesh, AtomsUtils::M
 
     V2fVectorDataPtr uvData = new V2fVectorData;
     uvData->setInterpretation( GeometricData::UV );
-    auto& outUV = uvData->writable();
-    outUV.reserve( inIndices.size() );
-    for ( auto id: inIndices )
-        outUV.push_back( uvSet.uvs[id] );
+    uvData->writable() = uvSet.uvs;
+    IECore::IntVectorDataPtr uvIndicesData = new IECore::IntVectorData;
+    auto &uvIndices = uvIndicesData->writable();
+    uvIndices.insert( uvIndices.end(), inIndices.begin(), inIndices.end() );
 
-    return PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData );
+    return PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData, uvIndicesData );
 }
 
 MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, bool genPref, bool genNref )
@@ -150,9 +150,13 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
         {
             auto &uvSet = uvSets[i];
             auto uvPrim = convertUvs( mesh, uvSet );
-            meshPtr->variables[uvSet.name] = uvPrim;
+
             if (i == 0) {
                 meshPtr->variables["uv"] = uvPrim;
+            }
+            else
+            {
+                meshPtr->variables[uvSet.name] = uvPrim;
             }
         }
     }
@@ -214,21 +218,8 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
         meshPtr->variables["blendShapeCount"] =  PrimitiveVariable( PrimitiveVariable::Constant, blendShapeCount );
     }
 
-    // Convert the atoms metadata
+    // Convert the atoms prim vars
     auto &translator = AtomsMetadataTranslator::instance();
-    auto attributesMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "attributes" );
-    if ( attributesMap ) {
-        auto atomsMap = attributesMap->getTypedEntry<const AtomsCore::MapMetadata>("atoms");
-        if (atomsMap && atomsMap->size() > 0) {
-
-            for (auto it = atomsMap->cbegin(); it != atomsMap->cend(); ++it) {
-                meshPtr->variables[it->first] = PrimitiveVariable(PrimitiveVariable::Constant,
-                                                                  translator.translate(it->second));
-            }
-        }
-    }
-
-
     auto primVarsMap = geoMap->getTypedEntry<const AtomsCore::MapMetadata>( "primVars" );
     if ( primVarsMap )
     {
@@ -277,10 +268,27 @@ public :
         AtomsPtr<AtomsCore::MapMetadata> data;
         std::set<std::string> variations;
         std::map<std::string, AtomsDagNode> children;
+
+        size_t memSize() const
+        {
+            size_t totalMemory = AtomsCore::memSize( name );
+            if ( data )
+                totalMemory += data->memSize();
+            totalMemory += AtomsCore::memSize( variations );
+            for (auto it = children.cbegin(); it != children.cend(); ++it)
+            {
+                totalMemory += AtomsCore::memSize( it->first );
+                totalMemory += it->second.memSize();
+            }
+
+            totalMemory += sizeof( this );
+            return totalMemory;
+        }
     };
 
     EngineData( const std::string& filePath ):
-        m_filePath( filePath )
+        m_filePath( filePath ),
+        m_totalMemory( 0 )
     {
         m_hierarchy = AtomsPtr<AtomsCore::MapMetadata>( new AtomsCore::MapMetadata );
         m_root.children.clear();
@@ -418,6 +426,100 @@ public :
             auto agentTypeHierarchyData = std::static_pointer_cast<AtomsCore::Metadata>( agentTypeHierarchy );
             m_hierarchy->addEntry( agentTypeNames[aTypeId],agentTypeHierarchyData, false );
         }
+
+        m_totalMemory = 0;
+        for (const auto& agentTypeName: m_variations.getAgentTypeNames() )
+        {
+            m_totalMemory += AtomsCore::memSize( agentTypeName );
+            auto aTypePtr = m_variations.getAgentTypeVariationPtr( agentTypeName );
+            if ( !aTypePtr )
+                continue;
+
+            for (const auto& name: aTypePtr->getGeometryNames() )
+            {
+                m_totalMemory +=  AtomsCore::memSize( name );
+                auto dataPtr = aTypePtr->getGeometryPtr( name );
+                if ( !dataPtr )
+                    continue;
+
+                m_totalMemory +=  AtomsCore::memSize( dataPtr->getGeometryFile() );
+                m_totalMemory += AtomsCore::memSize( dataPtr->getGeometryFilter() );
+                m_totalMemory += sizeof(*dataPtr);
+            }
+
+            for ( const auto& name: aTypePtr->getMaterialNames() )
+            {
+                m_totalMemory += AtomsCore::memSize( name );
+                auto dataPtr = aTypePtr->getMaterialPtr( name );
+                if ( !dataPtr )
+                    continue;
+
+                m_totalMemory += AtomsCore::memSize( dataPtr->getMaterialFile() );
+                m_totalMemory += AtomsCore::memSize( dataPtr->getDiffuseFile() );
+                m_totalMemory += AtomsCore::memSize( dataPtr->getSpecularFile() );
+                m_totalMemory += AtomsCore::memSize( dataPtr->getNormalMapFile() );
+                m_totalMemory += sizeof(*dataPtr);
+            }
+
+            for (const auto& name: aTypePtr->getGroupNames() )
+            {
+                m_totalMemory += AtomsCore::memSize( name );
+                auto dataPtr = aTypePtr->getGroupPtr( name );
+                if ( !dataPtr )
+                    continue;
+
+                for ( unsigned int id = 0; id < dataPtr->numCombinations(); ++id )
+                {
+                    auto variation = dataPtr->getCombinationAtIndex( id );
+                    m_totalMemory += AtomsCore::memSize( variation.first );
+                    m_totalMemory += AtomsCore::memSize( variation.second );
+                    m_totalMemory += sizeof(variation);
+                }
+
+                for ( const auto& lodName: dataPtr->getLodNames() )
+                {
+                    m_totalMemory += AtomsCore::memSize( lodName );
+                    auto lodDataPtr = dataPtr->getLodPtr( lodName );
+                    if ( !lodDataPtr )
+                        continue;
+
+                    for ( unsigned int id = 0; id < lodDataPtr->numCombinations(); ++id )
+                    {
+                        auto variation = dataPtr->getCombinationAtIndex( id );
+                        m_totalMemory += AtomsCore::memSize( variation.first );
+                        m_totalMemory += AtomsCore::memSize( variation.second );
+                        m_totalMemory += sizeof( variation );
+                    }
+                }
+
+
+                m_totalMemory +=  sizeof(*dataPtr);
+            }
+        }
+
+
+        m_totalMemory += AtomsCore::memSize( m_filePath );
+
+        for (auto aTypeIt = m_meshesFileCache.cbegin(); aTypeIt != m_meshesFileCache.cend(); ++aTypeIt)
+        {
+            for (auto meshIt = aTypeIt->second.cbegin(); meshIt != aTypeIt->second.cend(); ++meshIt)
+            {
+                if ( meshIt->second )
+                    m_totalMemory += meshIt->second->memSize();
+            }
+        }
+
+        if ( m_hierarchy )
+            m_totalMemory += m_hierarchy->memSize();
+
+        m_totalMemory += AtomsCore::memSize( m_defaultSets );
+
+        m_totalMemory += m_root.memSize();
+    }
+
+    virtual ~EngineData()
+    {
+
     }
 
     void flatMeshHierarchy( AtomsCore::MapMetadata* geos, AtomsPtr<AtomsCore::MapMetadata>& outMap, AtomsDagNode* rootNode )
@@ -777,6 +879,11 @@ protected :
         msg( Msg::Warning, "EngineData::load", "Not implemented" );
     }
 
+    virtual void memoryUsage( Object::MemoryAccumulator &accumulator ) const
+    {
+        accumulator.accumulate( m_totalMemory );
+    }
+
 private :
 
     Atoms::Variations m_variations;
@@ -790,6 +897,8 @@ private :
     std::vector<std::string> m_defaultSets;
 
     AtomsDagNode m_root;
+
+    size_t m_totalMemory;
 };
 
 size_t AtomsVariationReader::g_firstPlugIndex = 0;
@@ -1067,7 +1176,7 @@ IECore::ConstCompoundObjectPtr AtomsVariationReader::computeAttributes( const Sc
                             auto data = translator.translate( meshAttrIt->second );
                             if (data)
                             {
-                                result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
+                               result->members()["user:" + attrIt->first + ":" + meshAttrIt->first] = data;
                             }
                         }
                     }

@@ -78,6 +78,29 @@ IECore::DataPtr metadataSimpleTranslator( const AtomsPtr<const AtomsCore::Metada
     return boost::static_pointer_cast<Data>( ieData );
 }
 
+template <>
+IECore::DataPtr metadataSimpleTranslator<Imath::V2d>( const AtomsPtr<const AtomsCore::Metadata>& metadata )
+{
+    auto value = std::static_pointer_cast<const AtomsCore::Vector2Metadata>( metadata )->get();
+    typename TypedData<Imath::V2f>::Ptr ieData = new TypedData<Imath::V2f>();
+    auto& outVec = ieData->writable();
+    outVec.x = static_cast<float>( value.x );
+    outVec.y = static_cast<float>( value.y );
+    return boost::static_pointer_cast<Data>( ieData );
+}
+
+template <>
+IECore::DataPtr metadataSimpleTranslator<Imath::V3d>( const AtomsPtr<const AtomsCore::Metadata>& metadata )
+{
+    auto value = std::static_pointer_cast<const AtomsCore::Vector3Metadata>( metadata )->get();
+    typename TypedData<Imath::V3f>::Ptr ieData = new TypedData<Imath::V3f>();
+    auto& outVec = ieData->writable();
+    outVec.x = static_cast<float>( value.x );
+    outVec.y = static_cast<float>( value.y );
+    outVec.z = static_cast<float>( value.z );
+    return boost::static_pointer_cast<Data>( ieData );
+}
+
 template <typename T>
 IECore::DataPtr metadataGeometricTranslator( const AtomsPtr<const AtomsCore::Metadata>& metadata )
 {
@@ -87,6 +110,28 @@ IECore::DataPtr metadataGeometricTranslator( const AtomsPtr<const AtomsCore::Met
     return boost::static_pointer_cast<Data>( ieData );
 }
 
+template <>
+IECore::DataPtr metadataGeometricTranslator<Imath::V2d>( const AtomsPtr<const AtomsCore::Metadata>& metadata )
+{
+    auto value = std::static_pointer_cast<const AtomsCore::Vector2Metadata>( metadata )->get();
+    typename GeometricTypedData<Imath::V2f>::Ptr ieData = new GeometricTypedData<Imath::V2f>();
+    auto& outVec = ieData->writable();
+    outVec.x = static_cast<float>( value.x );
+    outVec.y = static_cast<float>( value.y );
+    return boost::static_pointer_cast<Data>( ieData );
+}
+
+template <>
+IECore::DataPtr metadataGeometricTranslator<Imath::V3d>( const AtomsPtr<const AtomsCore::Metadata>& metadata )
+{
+    auto value = std::static_pointer_cast<const AtomsCore::Vector3Metadata>( metadata )->get();
+    typename GeometricTypedData<Imath::V3f>::Ptr ieData = new GeometricTypedData<Imath::V3f>();
+    auto& outVec = ieData->writable();
+    outVec.x = static_cast<float>( value.x );
+    outVec.y = static_cast<float>( value.y );
+    outVec.z = static_cast<float>( value.z );
+    return boost::static_pointer_cast<Data>( ieData );
+}
 
 template <typename T>
 IECore::DataPtr metadataArrayTranslator( const AtomsPtr<const AtomsCore::Metadata>& metadata )

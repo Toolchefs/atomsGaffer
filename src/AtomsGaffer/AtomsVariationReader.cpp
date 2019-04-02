@@ -317,6 +317,7 @@ public :
 
             const auto& agentTypeName = agentTypeNames[aTypeId];
             auto& agentTypeRoot = m_root.children[agentTypeName];
+            agentTypeRoot.name = agentTypeName;
             auto agentTypePtr = m_variations.getAgentTypeVariationPtr( agentTypeName);
             if ( !agentTypePtr )
                 continue;
@@ -358,7 +359,10 @@ public :
                     currentRoot->variations.insert(variationName);
                     for( const auto& objName: objectNames )
                     {
+                        if ( objName == "" )
+                            continue;
                         currentRoot = &currentRoot->children[objName];
+                        currentRoot->name = objName;
                         currentRoot->variations.insert( variationName );
                         auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>( objName );
                         if ( !objIt )
@@ -405,7 +409,10 @@ public :
                         AtomsDagNode* currentRoot = &agentTypeRoot;
                         currentRoot->variations.insert( variationName + ":" + lodName );
                         for ( const auto &objName: lodObjectNames ) {
+                            if ( objName == "" )
+                                continue;
                             currentRoot = &currentRoot->children[objName];
+                            currentRoot->name = objName;
                             currentRoot->variations.insert( variationName + ":" + lodName );
                             auto objIt = currentMap->getTypedEntry<AtomsCore::MapMetadata>(objName);
                             if (!objIt) {
@@ -538,8 +545,14 @@ public :
 
             AtomsDagNode* childRootNode = nullptr;
             if ( rootNode ) {
-                childRootNode = &rootNode->children[it->first];
-                childRootNode->data = meshGroup;
+                std::vector<std::string> objectNames;
+                AtomsUtils::splitString( it->first, '|', objectNames );
+
+                if ( objectNames.size() > 0)
+                {
+                    childRootNode = &rootNode->children[objectNames.back()];
+                    childRootNode->data = meshGroup;
+                }
             }
             flatMeshHierarchy( meshGroup.get(), outMap, childRootNode );
         }
@@ -836,13 +849,15 @@ public :
             const std::string& currentPath ) const
     {
         if ( node->data ) {
+
             auto sets = node->data->getTypedEntry<const AtomsCore::StringArrayMetadata>( "sets" );
             if ( sets ) {
                 auto& setVec = sets->get();
                 for ( auto& currentSet: setVec ) {
                     if ( currentSet == setName ) {
-                        for ( auto& variation: node->variations )
-                            paths.push_back( variation + "/" + currentPath );
+                        for ( auto& variation: node->variations ) {
+                            paths.push_back(variation + "/" + currentPath);
+                        }
                         break;
                     }
                 }
@@ -850,7 +865,12 @@ public :
         }
 
         for ( auto it = node->children.cbegin(); it != node->children.cend(); ++it ) {
-            collectAllPathFromSetName( setName, &it->second, paths, currentPath + "/" + it->first );
+            if (currentPath.empty() || currentPath == "/")
+            {
+                collectAllPathFromSetName(setName, &it->second, paths, it->first);
+            } else {
+                collectAllPathFromSetName(setName, &it->second, paths, currentPath + "/" + it->first);
+            }
         }
     }
 
@@ -1575,6 +1595,7 @@ IECore::ConstPathMatcherDataPtr AtomsVariationReader::computeSet( const IECore::
         return resultData;
     }
     auto &result = resultData->writable();
+
 
     if ( !engineData->isDefaultSet( setName ) )  {
         const EngineData::AtomsDagNode *rootNode = &engineData->root();

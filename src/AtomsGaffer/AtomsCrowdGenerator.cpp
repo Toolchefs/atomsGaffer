@@ -435,8 +435,8 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         Imath::Box3d agentClothBBox;
 		ConstCompoundObjectPtr crowd;
 		{
-			ScenePlug::PathScope scope(context, parentPath);
-			crowd = runTimeCast<const CompoundObject>(inPlug()->attributesPlug()->getValue());
+			ScenePlug::PathScope scope( context, parentPath );
+			crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
             agentClothBBox = agentClothBoudingBox( parentPath, branchPath );
 		}
 
@@ -469,12 +469,26 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
             throw InvalidArgumentException( "AtomsCrowdGenerator : computeBranchBound : No agent found." );
         }
 
+        Imath::M44d transformMtx;
+        Imath::M44d transformInvMtx;
+        ScenePath transfromPath;
+        if ( branchPath.size() > 2 ) {
+            transfromPath.push_back( branchPath[1] );
+            transfromPath.push_back( branchPath[2] );
+            for ( int ii = 4; ii < branchPath.size(); ++ii ) {
+                transfromPath.push_back( branchPath[ii] );
+            }
+            transformMtx = Imath::M44d( variationsPlug()->fullTransform( transfromPath ) );
+            transformInvMtx = transformMtx.inverse();
+        }
+
         // Extract the agent root matrix
         Imath::M44d rootInvMatrix;
+        Imath::M44d rootMatrix;
         auto poseData = agentData->member<const M44dData>( "rootMatrix" );
         if ( poseData ) {
-            rootInvMatrix = poseData->readable();
-            rootInvMatrix.invert();
+            rootMatrix = poseData->readable();
+            rootInvMatrix = rootMatrix.inverse();
         }
 
 
@@ -483,15 +497,18 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         if ( boxData )
         {
             float padding  = boundingBoxPaddingPlug()->getValue();
-            Imath::Box3d agentBox = boxData->readable();
+            Imath::Box3d agentBox;
+            agentBox.extendBy( boxData->readable().min * transformInvMtx );
+            agentBox.extendBy( boxData->readable().max * transformInvMtx );
             if ( !agentClothBBox.isEmpty() )
             {
                 // The cloth bounding box is in world space. Convert in local space
-                agentBox.extendBy( agentClothBBox.min * rootInvMatrix );
-                agentBox.extendBy( agentClothBBox.max * rootInvMatrix );
+                agentBox.extendBy( agentClothBBox.min * transformInvMtx * rootInvMatrix );
+                agentBox.extendBy( agentClothBBox.max * transformInvMtx * rootInvMatrix );
             }
-            result.extendBy( agentBox.min - Imath::V3f(padding, padding, padding) );
-            result.extendBy( agentBox.max + Imath::V3f(padding, padding, padding) );
+
+            result.extendBy( agentBox.min - Imath::V3f( padding, padding, padding ) );
+            result.extendBy( agentBox.max + Imath::V3f( padding, padding, padding ) );
         }
         else
         {
@@ -520,8 +537,8 @@ void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, cons
 	{
 		// "/agents/<agentType>/<variation>/<id>/..."
 		AgentScope scope( context, branchPath );
-		variationsPlug()->transformPlug()->hash(h);
-		inPlug()->attributesPlug()->hash(h);
+		variationsPlug()->transformPlug()->hash( h );
+		inPlug()->attributesPlug()->hash( h );
         inPlug()->objectPlug()->hash( h );
         h.append( branchPath[3] );
 	}
@@ -579,10 +596,10 @@ void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, con
         inPlug()->objectPlug()->hash( h );
 
         // The other attributes are stored inside the agent metadata map inside the cache
-        auto agentData = agentCacheData(branchPath);
+        auto agentData = agentCacheData( branchPath );
         auto metadataData = agentData->member<const CompoundData>( "metadata" );
         auto& metadataMap = metadataData->readable();
-        for (auto memberIt = metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt)
+        for ( auto memberIt = metadataMap.cbegin(); memberIt != metadataMap.cend(); ++memberIt )
         {
             memberIt->second->hash( h );
         }
@@ -605,13 +622,13 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
     else if ( branchPath.size() == 2 )
     {
         // "/agents/<agentType>"
-        AgentScope scope(context, branchPath);
+        AgentScope scope( context, branchPath );
         return variationsPlug()->attributesPlug()->getValue();
     }
     else if ( branchPath.size() == 3 )
     {
         // "/agents/<agentType>/<variation>"
-        AgentScope scope(context, branchPath);
+        AgentScope scope( context, branchPath );
         return variationsPlug()->attributesPlug()->getValue();
     }
 	else if( branchPath.size() == 4 )
@@ -713,7 +730,7 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 
         for ( auto primIt = points->variables.cbegin(); primIt != points->variables.cend(); ++primIt )
         {
-            size_t atomsIndex = primIt->first.find("atoms:");
+            size_t atomsIndex = primIt->first.find( "atoms:" );
             if ( atomsIndex != 0 ) {
                 continue;
             }
@@ -793,7 +810,10 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
                     auto quat = data->readable()[agentIdPointIndex];
                     Imath::Eulerf euler;
                     euler.extract(quat);
-                    outData->writable() = Imath::V3f(euler.x * 180.0 / M_PI, euler.y * 180.0 / M_PI, euler.z * 180.0 / M_PI);
+                    outData->writable() = Imath::V3f(
+                            euler.x * 180.0 / M_PI,
+                            euler.y * 180.0 / M_PI,
+                            euler.z * 180.0 / M_PI );
                     objMap[variableName] = outData;
                     break;
                 }
@@ -815,9 +835,9 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 		AgentScope scope( context, branchPath );
         CompoundObjectPtr outAttributes = variationsPlug()->attributesPlug()->getValue()->copy();
         // Remove the skin weights data
-        outAttributes->members().erase("jointIndexCount");
-        outAttributes->members().erase("jointIndices");
-        outAttributes->members().erase("jointWeights");
+        outAttributes->members().erase( "jointIndexCount" );
+        outAttributes->members().erase( "jointIndices" );
+        outAttributes->members().erase( "jointWeights" );
         return outAttributes;
 	}
 }
@@ -916,6 +936,19 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         return variationsPlug()->objectPlug()->getValue();
     }
 
+
+    Imath::M44f transformMtx;
+    ScenePath transfromPath;
+    if (branchPath.size() > 2) {
+        transfromPath.push_back(branchPath[1]);
+        transfromPath.push_back(branchPath[2]);
+        for (int ii = 4; ii < branchPath.size(); ++ii) {
+            transfromPath.push_back(branchPath[ii]);
+        }
+        transformMtx = variationsPlug()->fullTransform(transfromPath);
+    }
+
+
     auto agentData = agentCacheData( branchPath );
     auto metadataData = agentData->member<const CompoundData>( "metadata" );
 
@@ -975,7 +1008,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         }
 
         // Apply the cloth deformation
-        if ( !applyClothDeformer( branchPath, result, cloth, rootMatrix ) )
+        if ( !applyClothDeformer( branchPath, result, cloth, rootMatrix, transformMtx  ) )
         {
             return variationsPlug()->objectPlug()->getValue();
         }
@@ -983,15 +1016,15 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
         if ( stackOrder == "first" )
         {
             // It's a first stack order mesh, so apply the skinning
-            applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices );
+            applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices, transformMtx );
         }
     }
     else
     {
         // Apply blend shapes
-        applyBlendShapesDeformer( branchPath, result, metadataData, pointVariablesData, agentIdPointIndex );
+        applyBlendShapesDeformer( branchPath, result, metadataData, pointVariablesData, agentIdPointIndex, transformMtx  );
         // Apply skinning
-        applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices );
+        applySkinDeformer( branchPath, result, meshPrim, meshAttributes, worldMatrices, transformMtx );
     }
 
     return result;
@@ -1264,7 +1297,7 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentClothMeshData( const ScenePath &p
     auto clothAgentIt = clothData.find( branchPath[3] );
     if ( clothAgentIt == clothData.cend() )
     {
-        clothAgentIt = clothData.find( "*" );
+        clothAgentIt = clothData.find( "-1" );
         if ( clothAgentIt == clothData.cend() )
         {
             return result;
@@ -1277,14 +1310,23 @@ ConstCompoundDataPtr AtomsCrowdGenerator::agentClothMeshData( const ScenePath &p
         return result;
     }
 
-    auto clothMeshIt = clothAgent->readable().find( branchPath.back() );
-    if ( clothMeshIt == clothAgent->readable().cend() )
+    for (auto clothMeshIt = clothAgent->readable().cbegin(); clothMeshIt != clothAgent->readable().cend(); ++clothMeshIt)
     {
-        return result;
+        std::string key = clothMeshIt->first.string();
+        auto pathSplitPos = key.rfind('|');
+        if (pathSplitPos != std::string::npos)
+        {
+            key = key.substr(pathSplitPos + 1);
+        }
+
+        if (key == branchPath.back().string())
+        {
+            return runTimeCast<const CompoundData>( clothMeshIt->second );
+        }
+
     }
 
-    result = runTimeCast<const CompoundData>( clothMeshIt->second );
-    return result;
+     return result;
 }
 
 Imath::Box3d AtomsCrowdGenerator::agentClothBoudingBox( const ScenePath &parentPath, const ScenePath &branchPath ) const
@@ -1321,9 +1363,11 @@ Imath::Box3d AtomsCrowdGenerator::agentClothBoudingBox( const ScenePath &parentP
         return result;
     }
 
+
     auto boxData = runTimeCast<const Box3dData>( clothMeshIt->second );
-    if ( boxData )
+    if ( boxData ) {
         result = boxData->readable();
+    }
     return result;
 }
 
@@ -1332,7 +1376,8 @@ void AtomsCrowdGenerator::applySkinDeformer(
         MeshPrimitivePtr& result,
         ConstMeshPrimitivePtr& meshPrim,
         ConstCompoundObjectPtr& meshAttributes,
-        const std::vector<Imath::M44d>& worldMatrices
+        const std::vector<Imath::M44d>& worldMatrices,
+        const Imath::M44f& transformMatrix
         ) const
 {
     auto jointIndexCountData = meshAttributes->member<const IntVectorData>( "jointIndexCount" );
@@ -1368,15 +1413,19 @@ void AtomsCrowdGenerator::applySkinDeformer(
     if ( jointIndexCountVec.size() != pointsData.size() )
     {
         throw InvalidArgumentException( "AtomsAttributes : " + branchPath[3].string() + "Invalid jointIndexCount data of length " +
-                                        std::to_string( pointsData.size() ) + ", expected " + std::to_string( pointsData.size() ) +
+                                        std::to_string( jointIndexCountVec.size() ) + ", expected " + std::to_string( pointsData.size() ) +
                                         ". ALl points must be skinned, please check your setup scene" );
     }
 
     Imath::V4d newP, currentPoint;
+    auto transformInverseMatrix = transformMatrix.inverse();
+    auto transfromNormalMatrix = transformInverseMatrix.transposed();
+    auto transfromNormalInverseMatrix = transfromNormalMatrix.inverse();
     for ( size_t vId = 0; vId < jointIndexCountVec.size(); ++vId )
     {
         offsetData[vId] = counter;
         Imath::V3f& inPoint = pointsData[vId];
+        inPoint *= transformMatrix;
         newP.x = 0.0;
         newP.y = 0.0;
         newP.z = 0.0;
@@ -1396,6 +1445,8 @@ void AtomsCrowdGenerator::applySkinDeformer(
         inPoint.x = newP.x;
         inPoint.y = newP.y;
         inPoint.z = newP.z;
+
+        inPoint *= transformInverseMatrix;
     }
 
 
@@ -1411,6 +1462,7 @@ void AtomsCrowdGenerator::applySkinDeformer(
     }
 
     auto &normals = nData->writable();
+    Imath::V4f newN, currentNormal;
     for ( size_t vtxId = 0; vtxId < vertexIds.size(); ++vtxId )
     {
         int pointId = vertexIds[vtxId];
@@ -1418,24 +1470,32 @@ void AtomsCrowdGenerator::applySkinDeformer(
 
         Imath::V3f &inNormal = normals[vtxId];
 
-        newP.x = 0.0;
-        newP.y = 0.0;
-        newP.z = 0.0;
-        newP.w = 0.0;
+        newN.x = 0.0f;
+        newN.y = 0.0f;
+        newN.z = 0.0f;
+        newN.w = 0.0f;
 
-        currentPoint.x = inNormal.x;
-        currentPoint.y = inNormal.y;
-        currentPoint.z = inNormal.z;
-        currentPoint.w = 0.0;
+        currentNormal.x = inNormal.x;
+        currentNormal.y = inNormal.y;
+        currentNormal.z = inNormal.z;
+        currentNormal.w = 0.0;
 
-        for (size_t jId = 0; jId < jointIndexCountVec[pointId]; ++jId) {
+        currentNormal *= transfromNormalMatrix;
+        currentNormal.w = 0.0;
+        currentNormal.normalize();
+
+        for ( size_t jId = 0; jId < jointIndexCountVec[pointId]; ++jId ) {
             int jointId = jointIndicesVec[offset];
-            newP += currentPoint * jointWeightsVec[offset] * worldMatrices[jointId];
+            newN += currentNormal * jointWeightsVec[offset] * worldMatrices[jointId];
         }
 
-        inNormal.x = newP.x;
-        inNormal.y = newP.y;
-        inNormal.z = newP.z;
+        newN *= transfromNormalMatrix;
+        newN.w = 0.0;
+        newN.normalize();
+
+        inNormal.x = newN.x;
+        inNormal.y = newN.y;
+        inNormal.z = newN.z;
         inNormal.normalize();
     }
 }
@@ -1445,7 +1505,8 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
         MeshPrimitivePtr& result,
         const IECore::CompoundData* metadataData,
         const CompoundDataMap& pointVariablesData,
-        const int agentIdPointIndex
+        const int agentIdPointIndex,
+        const Imath::M44f& transformMatrix
         ) const
 {
     auto pVarIt = result->variables.find( "P" );
@@ -1475,20 +1536,20 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
                                           "_" + std::string( branchPath.back().c_str()) + "_" +
                                           std::to_string(blendId);
 
-        auto pointsVariableIt = pointVariablesData.find(blendWeightMetaName);
+        auto pointsVariableIt = pointVariablesData.find( blendWeightMetaName );
         if ( ( agentIdPointIndex != -1 ) && ( pointsVariableIt != pointVariablesData.end() ) &&
             ( pointsVariableIt->second->typeId() == FloatVectorData::staticTypeId() ) )
         {
-            auto &primWeightVec = runTimeCast<FloatVectorData>(pointsVariableIt->second)->readable();
+            auto &primWeightVec = runTimeCast<FloatVectorData>( pointsVariableIt->second )->readable();
             weight = primWeightVec[agentIdPointIndex];
         }
         else
         {
-            auto blendWeightDataIt = metadataMap.find(blendWeightMetaName);
+            auto blendWeightDataIt = metadataMap.find( blendWeightMetaName );
             if (blendWeightDataIt == metadataMap.cend())
                 continue;
 
-            auto blendWeightData = runTimeCast<const DoubleData>(blendWeightDataIt->second);
+            auto blendWeightData = runTimeCast<const DoubleData>( blendWeightDataIt->second );
             if (!blendWeightData)
                 continue;
 
@@ -1499,17 +1560,17 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
             continue;
 
         auto blendPointsData = runTimeCast<V3fVectorData>(
-                result->variables["blendShape_" + std::to_string(blendId) + "_P"].data);
+                result->variables["blendShape_" + std::to_string( blendId ) + "_P"].data);
         if (!blendPointsData)
             continue;
 
 
         auto &blendPointsVec = blendPointsData->readable();
 
-        if (blendPointsVec.size() != points.size())
+        if ( blendPointsVec.size() != points.size() )
             continue;
 
-        blendPoints.push_back(&blendPointsVec);
+        blendPoints.push_back( &blendPointsVec );
         blendWeights.push_back(weight);
     }
 
@@ -1526,9 +1587,9 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
         {
             auto& blendP = *blendPoints[blendId];
             double weight = blendWeights[blendId];
-            currentPoint.x += (blendP[ptId].x - points[ptId].x) * weight;
-            currentPoint.y += (blendP[ptId].y - points[ptId].y) * weight;
-            currentPoint.z += (blendP[ptId].z - points[ptId].z) * weight;
+            currentPoint.x += ( blendP[ptId].x - points[ptId].x ) * weight;
+            currentPoint.y += ( blendP[ptId].y - points[ptId].y ) * weight;
+            currentPoint.z += ( blendP[ptId].z - points[ptId].z ) * weight;
         }
 
         meshPoint.x = currentPoint.x;
@@ -1543,39 +1604,39 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
         if (meshNormalData) {
             std::vector<const std::vector<Imath::V3f> *> blendNormals;
             auto &normals = meshNormalData->writable();
-            for (size_t blendId = 0; blendId < numBlendShapes; ++blendId) {
+            for ( size_t blendId = 0; blendId < numBlendShapes; ++blendId ) {
                 auto blendNormalsData = runTimeCast<V3fVectorData>(
-                        result->variables["blendShape_" + std::to_string(blendId) + "_N"].data);
-                if (!blendNormalsData)
+                        result->variables["blendShape_" + std::to_string( blendId ) + "_N"].data);
+                if ( !blendNormalsData )
                     continue;
 
                 auto &blendNormalsVec = blendNormalsData->readable();
-                if (blendNormalsVec.size() != normals.size())
+                if ( blendNormalsVec.size() != normals.size() )
                     continue;
 
-                blendNormals.push_back(&blendNormalsVec);
+                blendNormals.push_back( &blendNormalsVec );
 
             }
 
             Imath::V3f currentNormal;
-            if (blendWeights.size() > 0 && blendNormals.size() == blendWeights.size()) {
-                for (size_t ptId = 0; ptId < normals.size(); ++ptId) {
+            if ( blendWeights.size() > 0 && blendNormals.size() == blendWeights.size() ) {
+                for ( size_t ptId = 0; ptId < normals.size(); ++ptId ) {
                     auto &meshNormal = normals[ptId];
                     currentNormal.x = meshNormal.x;
                     currentNormal.y = meshNormal.y;
                     currentNormal.z = meshNormal.z;
 
-                    Imath::V3f pNormals(currentNormal.x, currentNormal.y, currentNormal.z);
-                    Imath::V3f blendNormal(0.0, 0.0, 0.0);
+                    Imath::V3f pNormals( currentNormal.x, currentNormal.y, currentNormal.z );
+                    Imath::V3f blendNormal( 0.0f, 0.0f, 0.0f );
                     size_t counterN = 0;
 
-                    for (size_t blendId = 0; blendId < blendNormals.size(); blendId++) {
+                    for ( size_t blendId = 0; blendId < blendNormals.size(); blendId++ ) {
                         auto &blendN = *blendNormals[blendId];
                         double weight = blendWeights[blendId];
-                        blendNormal += pNormals * (1.0f - weight) + blendN[ptId] * weight;
+                        blendNormal += pNormals * ( 1.0f - weight ) + blendN[ptId] * weight;
                         counterN++;
                     }
-                    if (counterN > 0) {
+                    if ( counterN > 0 ) {
                         blendNormal = blendNormal / static_cast<float>( counterN );
                         blendNormal.normalize();
                         currentNormal.x = blendNormal.x;
@@ -1592,11 +1653,11 @@ void AtomsCrowdGenerator::applyBlendShapesDeformer(
     }
 
     // remove blend shape data
-    result->variables.erase("blendShapeCount");
-    for (int blendId = 0; blendId < numBlendShapes; ++blendId)
+    result->variables.erase( "blendShapeCount" );
+    for (int blendId = 0; blendId < numBlendShapes; ++blendId )
     {
-        result->variables.erase("blendShape_" + std::to_string( blendId ) + "_P");
-        result->variables.erase("blendShape_" + std::to_string( blendId ) + "_N");
+        result->variables.erase( "blendShape_" + std::to_string( blendId ) + "_P" );
+        result->variables.erase( "blendShape_" + std::to_string( blendId ) + "_N" );
     }
 }
 
@@ -1608,8 +1669,8 @@ Imath::M44f AtomsCrowdGenerator::agentRootMatrix(
 {
     ConstCompoundObjectPtr crowd;
     {
-        ScenePlug::PathScope scope(context, parentPath);
-        crowd = runTimeCast<const CompoundObject>(inPlug()->attributesPlug()->getValue());
+        ScenePlug::PathScope scope( context, parentPath );
+        crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
     }
 
     if( !crowd )
@@ -1638,7 +1699,7 @@ Imath::M44f AtomsCrowdGenerator::agentRootMatrix(
     auto poseData = agentData->member<const M44dData>( "rootMatrix" );
     if ( poseData )
     {
-        return Imath::M44f(poseData->readable());
+        return Imath::M44f( poseData->readable() );
     }
     else
     {
@@ -1650,11 +1711,17 @@ bool AtomsCrowdGenerator::applyClothDeformer(
         const ScenePath &branchPath,
         MeshPrimitivePtr& result,
         ConstCompoundDataPtr& cloth,
-        const Imath::M44f rootMatrix
+        const Imath::M44f& rootMatrix,
+        const Imath::M44f& transformMatrix
         ) const
 {
-    Imath::M44f rootInvMatrix = rootMatrix.inverse();
-    Imath::M44f rootNormalMatrix = rootMatrix.transposed();
+    Imath::M44f rootInvMatrix = ( transformMatrix * rootMatrix ).inverse();
+    Imath::M44f rootNormalMatrix = ( transformMatrix * rootMatrix ).transposed();
+
+    auto transformInverseMatrix = transformMatrix.inverse();
+    auto transformNormalMatrix = transformInverseMatrix.transposed();
+    auto transformNormalInverseMatrix = transformNormalMatrix.inverse();
+
     auto pVarIt = result->variables.find( "P" );
     auto pData = runTimeCast<V3fVectorData>( pVarIt->second.data );
     auto& clothData = cloth->readable();
@@ -1705,7 +1772,7 @@ bool AtomsCrowdGenerator::applyClothDeformer(
         return true;
     }
 
-    auto nClothData = runTimeCast<V3dVectorData>(clothNIt->second);
+    auto nClothData = runTimeCast<V3dVectorData>( clothNIt->second );
     if ( !nClothData )
     {
         return true;
@@ -1713,14 +1780,15 @@ bool AtomsCrowdGenerator::applyClothDeformer(
 
     auto &outputN = nData->writable();
     auto &inputN = nClothData->readable();
+
     // Check if the normals are as Vertex or FaceVarying interpolation
     if ( inputN.size() == pData->writable().size() )
     {
-        for (size_t vId = 0; vId < vertexIds.size(); ++vId) {
+        for ( size_t vId = 0; vId < vertexIds.size(); ++vId ) {
             size_t nId = vertexIds[vId];
             const auto &currentN = inputN[nId];
             auto &outN = outputN[vId];
-            Imath::V4f newN(currentN.x, currentN.y, currentN.z, 0.0);
+            Imath::V4f newN( currentN.x, currentN.y, currentN.z, 0.0f );
             newN = newN * rootNormalMatrix;
             outN.x = newN.x;
             outN.y = newN.y;
@@ -1734,8 +1802,8 @@ bool AtomsCrowdGenerator::applyClothDeformer(
         {
             const auto &currentN = inputN[nId];
             auto &outN = outputN[nId];
-            Imath::V4f newN(currentN.x, currentN.y, currentN.z, 0.0);
-            newN = newN * rootNormalMatrix;
+            Imath::V4f newN( currentN.x, currentN.y, currentN.z, 0.0f );
+            newN = newN * transformNormalInverseMatrix * rootNormalMatrix;
             outN.x = newN.x;
             outN.y = newN.y;
             outN.z = newN.z;
@@ -1744,8 +1812,8 @@ bool AtomsCrowdGenerator::applyClothDeformer(
     }
     else
     {
-        IECore::msg(IECore::Msg::Warning, "AtomsCrowdGenerator", "Agent " + branchPath[3].string() +
-        "Invalid cloth mesh normals");
+        IECore::msg( IECore::Msg::Warning, "AtomsCrowdGenerator", "Agent " + branchPath[3].string() +
+        "Invalid cloth mesh normals" );
     }
 
     return true;

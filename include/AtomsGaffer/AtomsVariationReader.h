@@ -107,13 +107,20 @@ class AtomsVariationReader : public GafferScene::SceneNode
 
 	private:
 
+		AtomsPtr<const AtomsCore::MapMetadata> getNodeDataFromHierarchy( const ScenePath &path ) const;
+
         void mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh& inMesh, size_t startSize ) const;
 
-		void mergeAtomsMesh(
+		void mergeBlendShapes(
 				AtomsPtr<AtomsCore::MapMetadata>& geoMap,
+				AtomsPtr<AtomsCore::ArrayMetadata>& outBlendMeta,
+				AtomsUtils::Mesh &inMesh,
+				size_t pointSize,
+				size_t normalSize ) const;
+
+		void mergeAtomsMesh(
 				AtomsPtr<AtomsCore::MapMetadata>& outGeoMap,
-				AtomsPtr<AtomsCore::MeshMetadata>& outMeshMeta,
-				AtomsPtr<AtomsCore::ArrayMetadata>& outBlendMeta
+				std::vector<AtomsPtr<AtomsCore::MapMetadata>>& geos
 		) const;
 
 	private :

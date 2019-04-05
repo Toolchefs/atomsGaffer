@@ -70,9 +70,8 @@ class AtomsCrowdClothReaderTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "17" in data )
 
 		agent_data = data["0"]
-		self.assertTrue( "flag" in agent_data )
-
-		flag_data = agent_data["flag"]
+		self.assertTrue( "RobotSkin1|flag_group|pPlane1" in agent_data )
+		flag_data = agent_data["RobotSkin1|flag_group|pPlane1"]
 		self.assertTrue( "P" in flag_data )
 		self.assertEqual( len(flag_data["P"]), 121 )
 		self.assertTrue( "N" in flag_data )
@@ -80,8 +79,12 @@ class AtomsCrowdClothReaderTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "stackOrder" in flag_data )
 		self.assertEqual( flag_data["stackOrder"].value, "last" )
 		self.assertTrue( "boundingBox" in flag_data )
-		self.assertAlmostEqual( flag_data["boundingBox"].value.min(), imath.V3d( -302.4302978515625, -0.043552137911319733, -367.09475708007812 ) )
-		self.assertAlmostEqual( flag_data["boundingBox"].value.max(), imath.V3d( -270.42013549804688, 32.08740234375, -297.2152099609375 ) )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.min().x, -298.7542419433594 )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.min().y, -42.13385772705078 )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.min().z, -331.2435302734375 )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.max().x, -272.296875 )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.max().y, 22.100797653198242 )
+		self.assertAlmostEqual( flag_data["boundingBox"].value.max().z, -294.7496032714844 )
 
 
 if __name__ == "__main__":

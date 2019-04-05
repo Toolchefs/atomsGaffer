@@ -86,7 +86,8 @@ public :
 
     EngineData( const std::string& filePath, float frame, const std::string& agentIdsStr ):
             m_filePath( filePath ),
-            m_frame( frame )
+            m_frame( frame ),
+            m_memorySize( 0 )
     {
         m_frame = frame;
 
@@ -138,6 +139,48 @@ public :
             const std::string &agentTypeName = m_cache.agentType( m_frame, agentId );
             m_cache.loadAgentType( agentTypeName, false );
         }
+
+        if ( m_cache.prevFrameData().frame )
+            m_memorySize += m_cache.prevFrameData().frame->memSize();
+        if ( m_cache.prevFrameData().header )
+            m_memorySize += m_cache.prevFrameData().header->memSize();
+        if ( m_cache.prevFrameData().metadata )
+            m_memorySize += m_cache.prevFrameData().metadata->memSize();
+        if ( m_cache.prevFrameData().pose )
+            m_memorySize += m_cache.prevFrameData().pose->memSize();
+
+        if ( m_cache.frameData().frame )
+            m_memorySize +=  m_cache.frameData().frame->memSize();
+        if ( m_cache.frameData().header )
+            m_memorySize += m_cache.frameData().header->memSize();
+        if ( m_cache.frameData().metadata )
+            m_memorySize +=  m_cache.frameData().metadata->memSize();
+        if ( m_cache.frameData().pose )
+            m_memorySize +=  m_cache.frameData().pose->memSize();
+
+        if ( m_cache.nextFrameData().frame )
+            m_memorySize +=  m_cache.nextFrameData().frame->memSize();
+        if ( m_cache.nextFrameData().header )
+            m_memorySize += m_cache.nextFrameData().header->memSize();
+        if ( m_cache.nextFrameData().metadata )
+            m_memorySize +=  m_cache.nextFrameData().metadata->memSize();
+        if ( m_cache.nextFrameData().pose )
+            m_memorySize += m_cache.nextFrameData().pose->memSize();
+
+        auto& agentTypes = m_cache.agentTypes();
+        for ( const auto& agentTypeName: agentTypes.agentTypeNames() )
+        {
+            auto agentType = agentTypes.agentType(agentTypeName);
+            if ( !agentType )
+                continue;
+
+            m_memorySize += agentType->memSize();
+        }
+    }
+
+    virtual ~EngineData()
+    {
+
     }
 
     void hash( MurmurHash &h ) const override
@@ -302,6 +345,13 @@ protected :
         msg( Msg::Warning, "EngineData::load", "Not implemented" );
     }
 
+
+    virtual void memoryUsage( Object::MemoryAccumulator &accumulator ) const
+    {
+        accumulator.accumulate( m_memorySize );
+    }
+
+
 private :
 
     Atoms::AtomsCache m_cache;
@@ -311,6 +361,8 @@ private :
     std::vector<int> m_agentIds;
 
     float m_frame;
+
+    size_t m_memorySize;
 };
 
 size_t AtomsCrowdReader::g_firstPlugIndex = 0;
@@ -732,6 +784,7 @@ void AtomsCrowdReader::compute( Gaffer::ValuePlug *output, const Gaffer::Context
 {
     if ( output == enginePlug() )
     {
+        // check if the frame or file path is changed and update it
         static_cast<ObjectPlug *>( output )->setValue(
                 new EngineData( atomsSimFilePlug()->getValue(), context->getFrame() + timeOffsetPlug()->getValue(), agentIdsPlug()->getValue() )
                 );

@@ -13,7 +13,7 @@
             ]
           ],"lods":{
             
-          },"thumbnailPath":""
+          }
         },"RedRobot":{
           "combinations":[
             [
@@ -25,7 +25,7 @@
                 "Body|RobotBody","red_material"
               ]
             ]
-          },"thumbnailPath":""
+          }
         },"YellowRobot":{
           "combinations":[
             [
@@ -33,7 +33,7 @@
             ]
           ],"lods":{
             
-          },"thumbnailPath":""
+          }
         }
       },"lookFilePath":"","materials":{
         "purple_material":{
@@ -46,17 +46,17 @@
       }
     },"atomsRobot":{
       "clothSetupPath":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/cloth\/atomsRobot\/clothsetup.atomscloth","geometries":{
-        "flag":{
-          "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/flag.geos"
-        },"pole":{
-          "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/pole.geos"
-        },"robot1_arms":{
+        "RobotSkin1|arms|robot1_arms":{
           "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/robot1_arms.geos"
-        },"robot1_body":{
+        },"RobotSkin1|body|robot1_body":{
           "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/robot1_body.geos"
-        },"robot1_head":{
+        },"RobotSkin1|flag_group|pPlane1":{
+          "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/pPlane1.geos"
+        },"RobotSkin1|flag_group|pole":{
+          "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/pole.geos"
+        },"RobotSkin1|head|robot1_head":{
           "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/robot1_head.geos"
-        },"robot1_legs":{
+        },"RobotSkin1|legs|robot1_legs":{
           "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/robot1_legs.geos"
         },"robot2_arms":{
           "filter":"*","geometry":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/geometries\/atomsRobot\/robot2_arms.geos"
@@ -71,31 +71,33 @@
         "Robot1":{
           "combinations":[
             [
-              "pole","pole_material"
+              "RobotSkin1|flag_group|pPlane1","lambert1"
             ],[
-              "robot1_arms","robot1_material"
+              "RobotSkin1|head|robot1_head","robot1_material"
             ],[
-              "robot1_legs","robot1_material"
+              "RobotSkin1|legs|robot1_legs","robot1_material"
             ],[
-              "robot1_head","robot1_material"
+              "RobotSkin1|arms|robot1_arms","robot1_material"
             ],[
-              "robot1_body","robot1_material"
+              "RobotSkin1|body|robot1_body","robot1_material"
             ],[
-              "flag","flag_material"
+              "RobotSkin1|flag_group|pPlane1","lambert1"
+            ],[
+              "RobotSkin1|flag_group|pole","pole_material"
             ]
           ],"lods":{
             "A":[
               [
-                "robot1_body","robot1_material"
+                "RobotSkin1|body|robot1_body","robot1_material"
               ],[
-                "robot1_head","robot1_material"
+                "RobotSkin1|head|robot1_head","robot1_material"
               ]
             ],"B":[
               [
-                "robot1_body","robot1_material"
+                "RobotSkin1|body|robot1_body","robot1_material"
               ]
             ]
-          },"thumbnailPath":""
+          }
         },"Robot2":{
           "combinations":[
             [
@@ -119,17 +121,19 @@
                 "robot2_body","robot2_material"
               ]
             ]
-          },"thumbnailPath":""
+          }
         }
       },"lookFilePath":"","materials":{
         "flag_material":{
           "diffuse":"","diffuseColorBlue":0,"diffuseColorGreen":128,"diffuseColorRed":0,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/flag_material_ARN_MAT.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
+        },"lambert1":{
+          "diffuse":"","diffuseColorBlue":127,"diffuseColorGreen":127,"diffuseColorRed":127,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/lambert1.ass","normal":"","specular":"","specularColorBlue":0,"specularColorGreen":0,"specularColorRed":0,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
         },"pole_material":{
-          "diffuse":"","diffuseColorBlue":43,"diffuseColorGreen":43,"diffuseColorRed":43,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/pole_material_ARN_MAT.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
+          "diffuse":"","diffuseColorBlue":43,"diffuseColorGreen":43,"diffuseColorRed":43,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/pole_material.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
         },"robot1_material":{
-          "diffuse":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/preview\/atomsRobot\/robot1_material_diff.jpg","diffuseColorBlue":170,"diffuseColorGreen":170,"diffuseColorRed":170,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/robot1_material_ARN_MAT.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
+          "diffuse":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/preview\/atomsRobot\/robot1_material_diff.jpg","diffuseColorBlue":170,"diffuseColorGreen":170,"diffuseColorRed":170,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/robot1_material.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
         },"robot2_material":{
-          "diffuse":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/preview\/atomsRobot\/robot2_material_diff.jpg","diffuseColorBlue":170,"diffuseColorGreen":170,"diffuseColorRed":170,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/robot2_material_ARN_MAT.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
+          "diffuse":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/preview\/atomsRobot\/robot2_material_diff.jpg","diffuseColorBlue":170,"diffuseColorGreen":170,"diffuseColorRed":170,"diffuseWeight":1,"material":"${ATOMS_GAFFER_ROOT}\/examples\/assets\/atomsRobot\/materials\/atomsRobot\/robot2_material.ass","normal":"","specular":"","specularColorBlue":127,"specularColorGreen":127,"specularColorRed":127,"specularEccentricity":0.300000011920929,"specularRollOff":0.699999988079071,"specularWeight":0
         }
       }
     }

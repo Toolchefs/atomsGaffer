@@ -57,15 +57,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( a.getName(), "AtomsCrowdGenerator" )
 
 	def testChildNames( self ) :
-		variations_data = buildVariationTest()
-
-		#crowd_input = GafferSceneTest.CompoundObjectSource()
-		#crowd_input["in"].setValue( buildCrowdTest() )
 		crowd_input = AtomsGaffer.AtomsCrowdReader()
 		crowd_input["atomsSimFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms" )
 
-		#variations = GafferSceneTest.CompoundObjectSource()
-		#variations["in"].setValue( variations_data )
 		variations = AtomsGaffer.AtomsVariationReader()
 		variations["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
 
@@ -116,12 +110,20 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "12" in names )
 
 		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot1/0" )
+		self.assertTrue( "RobotSkin1" in names)
+
+		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1" )
+		self.assertTrue( "arms" in names)
+		self.assertTrue( "body" in names)
+		self.assertTrue( "legs" in names)
+		self.assertTrue( "head" in names)
+		self.assertTrue( "flag_group" in names)
+
+		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head" )
 		self.assertTrue( "robot1_head" in names)
+
+		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body" )
 		self.assertTrue( "robot1_body" in names)
-		self.assertTrue( "robot1_arms" in names)
-		self.assertTrue( "robot1_legs" in names)
-		self.assertTrue( "pole" in names)
-		self.assertTrue( "flag" in names)
 
 		names = node["out"].childNames( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertTrue( "robot2_body" in names)
@@ -143,16 +145,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "RobotBody" in names)
 
 	def testAttributes( self ) :
-		variations_data = buildVariationTest()
-
-		#crowd_input = GafferSceneTest.CompoundObjectSource()
-		#crowd_input["in"].setValue( buildCrowdTest() )
-
 		crowd_input = AtomsGaffer.AtomsCrowdReader()
 		crowd_input["atomsSimFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms" )
 
-		#variations = GafferSceneTest.CompoundObjectSource()
-		#variations["in"].setValue( variations_data )
 		variations = AtomsGaffer.AtomsVariationReader()
 		variations["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
 
@@ -201,26 +196,30 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "user:atoms:variation" in attributes )
 		self.assertEqual( attributes[ "user:atoms:variation" ].value, "Robot1" )
 
-		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/robot1_body" )
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body" )
+		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
+		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
+		self.assertTrue( "jointIndexCount" not in attributes )
+		self.assertTrue( "jointIndices" not in attributes )
+		self.assertTrue( "jointWeights" not in attributes )
+		self.assertEqual( attributes[ "user:atoms:fooBody" ].value, 1.5 )
+
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pole" )
 		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
 		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
 		self.assertTrue( "jointIndexCount" not in attributes )
 		self.assertTrue( "jointIndices" not in attributes )
 		self.assertTrue( "jointWeights" not in attributes )
 
-		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/pole" )
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pPlane1" )
 		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
 		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
 		self.assertTrue( "jointIndexCount" not in attributes )
 		self.assertTrue( "jointIndices" not in attributes )
 		self.assertTrue( "jointWeights" not in attributes )
 
-		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/flag" )
-		self.assertTrue( "ai:polymesh:subdiv_adaptive_space" in attributes )
-		self.assertEqual( attributes[ "ai:polymesh:subdiv_adaptive_space" ].value, "raster" )
-		self.assertTrue( "jointIndexCount" not in attributes )
-		self.assertTrue( "jointIndices" not in attributes )
-		self.assertTrue( "jointWeights" not in attributes )
+		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group" )
+		self.assertEqual( attributes[ "user:atoms:fooFlagGroup" ].value, imath.V3f( 1.0, 2.0, 3.0) )
 
 		attributes = node["out"].attributes( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertTrue( "user:atoms:agentType" in attributes )
@@ -258,16 +257,9 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "jointWeights" not in attributes )
 
 	def testCompute( self ) :
-		variations_data = buildVariationTest()
-
-		#crowd_input = GafferSceneTest.CompoundObjectSource()
-		#crowd_input["in"].setValue( buildCrowdTest() )
-
 		crowd_input = AtomsGaffer.AtomsCrowdReader()
 		crowd_input["atomsSimFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms" )
 
-		#variations = GafferSceneTest.CompoundObjectSource()
-		#variations["in"].setValue( variations_data )
 		variations = AtomsGaffer.AtomsVariationReader()
 		variations["atomsVariationFile"].setValue("${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json")
 
@@ -305,51 +297,48 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0" )
 		self.assertEqual( obj, IECore.NullObject() )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_head" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head/robot1_head" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 920 )
 		self.assertEqual( len(obj["N"].data), 3480 )
-		self.assertEqual( len(obj["uv"].data), 3480 )
-		self.assertEqual( len(obj["map1"].data), 3480 )
+		self.assertEqual( len(obj["uv"].data), 1533 )
 		self.assertTrue( "blendShape_0_P" not in obj )
 		self.assertTrue( "blendShape_1_P" not in obj )
 		self.assertTrue( "blendShape_0_N" not in obj )
 		self.assertTrue( "blendShape_1_N" not in obj )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_body" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 635 )
 		self.assertEqual( len(obj["N"].data), 2356 )
-		self.assertEqual( len(obj["uv"].data), 2356 )
-		self.assertEqual( len(obj["map1"].data), 2356 )
+		self.assertEqual( len(obj["uv"].data), 1222 )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_arms" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms/robot1_arms" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 960 )
 		self.assertEqual( len(obj["N"].data), 3424 )
-		self.assertEqual( len(obj["uv"].data), 3424 )
-		self.assertEqual( len(obj["map1"].data), 3424 )
+		self.assertEqual( len(obj["uv"].data), 1832 )
+		self.assertEqual( len(obj["primFaceAttr"].data), 828 )
+		self.assertEqual( len(obj["primObjAttr"].data), 1 )
+		self.assertEqual( len(obj["primVertsAttr"].data), 960 )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/robot1_legs" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 904 )
 		self.assertEqual( len(obj["N"].data), 3312 )
-		self.assertEqual( len(obj["uv"].data), 3312 )
-		self.assertEqual( len(obj["map1"].data), 3312 )
+		self.assertEqual( len(obj["uv"].data), 1516 )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/pole" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pole" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 1022 )
 		self.assertEqual( len(obj["N"].data), 4120 )
-		self.assertEqual( len(obj["uv"].data), 4120 )
-		self.assertEqual( len(obj["map1"].data), 4120 )
+		self.assertEqual( len(obj["uv"].data), 1113 )
 
-		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/flag" )
+		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pPlane1" )
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 121 )
 		self.assertEqual( len(obj["N"].data), 400 )
-		self.assertEqual( len(obj["uv"].data), 400 )
-		self.assertEqual( len(obj["map1"].data), 400 )
+		self.assertEqual( len(obj["uv"].data), 121 )
 
 		obj = node["out"].object( "/crowd/agents/atomsRobot/Robot2/1" )
 		self.assertEqual( obj, IECore.NullObject() )
@@ -370,7 +359,7 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 28149 )
 		self.assertEqual( len(obj["N"].data), 111930 )
-		self.assertEqual( len(obj["uv"].data), 111930 )
+		self.assertEqual( len(obj["uv"].data), 31402 )
 
 		obj = node["out"].object( "/crowd/agents/atoms2Robot/PurpleRobot/12" )
 		self.assertEqual( obj, IECore.NullObject() )
@@ -382,7 +371,321 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
 		self.assertEqual( len(obj["P"].data), 28149 )
 		self.assertEqual( len(obj["N"].data), 111930 )
-		self.assertEqual( len(obj["uv"].data), 111930 )
+		self.assertEqual( len(obj["uv"].data), 31402 )
+
+	def testTransform( self ) :
+		crowd_input = AtomsGaffer.AtomsCrowdReader()
+		crowd_input["atomsSimFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms" )
+
+		variations = AtomsGaffer.AtomsVariationReader()
+		variations["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
+
+		node = AtomsGaffer.AtomsCrowdGenerator()
+		node["parent"].setValue( "/crowd" )
+		node["in"].setInput( crowd_input["out"] )
+		node["variations"].setInput( variations["out"] )
+
+		cloth = AtomsGaffer.AtomsCrowdClothReader()
+		cloth["atomsClothFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cloth_cache/cloth_sim.clothcache" )
+		cloth["in"].setInput( crowd_input["out"] )
+		node["clothCache"].setInput( cloth["out"] )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1" )
+		self.assertEqual( obj, imath.M44f() )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head" )
+		self.assertEqual( obj, imath.M44f( 1, 0, 0, 0, 0, 0.995992899, 0.0894325897, 0, 0, -0.0894325897, 0.995992899, 0, 0, 1.03006685, -4.52774239, 1 ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head/robot1_head" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, 51.0, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, 13.1848993, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms/robot1_arms" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, 15.8421688, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body" )
+		self.assertEqual( obj, imath.M44f() )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, 16.0, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, -10.0, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs" )
+		self.assertEqual( obj, imath.M44f().translate( imath.V3f( 0.0, -33.0, 0.0 ) ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group" )
+		self.assertEqual( obj.translation(), imath.V3f( 75.4688797, 28.3711166, 11.6567278 ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pPlane1" )
+		self.assertEqual( obj, imath.M44f( 64.4932404, 0, 0, 0, 0, 64.4932404, 0, 0, 0, 0, 41.1785202, 0, -32.3346634, 0, 94.8534851, 1 ) )
+
+		obj = node["out"].transform( "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pole" )
+		self.assertEqual( obj, imath.M44f() )
+
+	def testSets( self ):
+		crowd_input = AtomsGaffer.AtomsCrowdReader()
+		crowd_input["atomsSimFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms" )
+
+		variations = AtomsGaffer.AtomsVariationReader()
+		variations["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
+
+		node = AtomsGaffer.AtomsCrowdGenerator()
+		node["parent"].setValue( "/crowd" )
+		node["in"].setInput( crowd_input["out"] )
+		node["variations"].setInput( variations["out"] )
+
+		cloth = AtomsGaffer.AtomsCrowdClothReader()
+		cloth["atomsClothFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cloth_cache/cloth_sim.clothcache" )
+		cloth["in"].setInput( crowd_input["out"] )
+		node["clothCache"].setInput( cloth["out"] )
+
+		set_names = node["out"]["setNames"].getValue()
+		obj = node["out"]
+		self.assertTrue( "atoms2Robot:PurpleRobot" in set_names )
+		self.assertEqual(
+			set( obj.set( "atoms2Robot:PurpleRobot" ).value.paths() ),
+			{
+				'/crowd/agents/atoms2Robot/PurpleRobot/12/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/PurpleRobot/15/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/PurpleRobot/19/Body/RobotBody'
+			}
+		)
+
+		self.assertTrue( "atoms2Robot:RedRobot" in set_names )
+		self.assertEqual(
+			set( obj.set( "atoms2Robot:RedRobot" ).value.paths() ),
+			{
+				'/crowd/agents/atoms2Robot/RedRobot/16/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/23/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/5/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/8/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/22/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/6/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/RedRobot/7/Body/RobotBody'
+
+			}
+		)
+		self.assertTrue( "atoms2Robot:RedRobot:A" in set_names )
+
+		self.assertTrue( "atoms2Robot:YellowRobot" in set_names )
+		self.assertEqual(
+			set( obj.set( "atoms2Robot:YellowRobot" ).value.paths() ),
+			{
+				'/crowd/agents/atoms2Robot/YellowRobot/9/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/YellowRobot/4/Body/RobotBody',
+				'/crowd/agents/atoms2Robot/YellowRobot/3/Body/RobotBody'
+
+			}
+		)
+
+		self.assertTrue( "atomsRobot:Robot1" in set_names )
+
+		self.assertEqual(
+			set( obj.set( "atomsRobot:Robot1" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/legs/robot1_legs'
+			}
+		)
+
+		self.assertTrue( "atomsRobot:Robot1:A" in set_names )
+		self.assertTrue( "atomsRobot:Robot1:B" in set_names )
+
+		self.assertTrue( "atomsRobot:Robot2" in set_names )
+		self.assertEqual(
+			set( obj.set( "atomsRobot:Robot2" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot2/11/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/2/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/11/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/21/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/1/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/14/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/1/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/13/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/14/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/20/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/11/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/11/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/2/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/21/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/20/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/1/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/1/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/20/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/13/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/13/robot2_arms',
+				'/crowd/agents/atomsRobot/Robot2/20/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/2/robot2_body',
+				'/crowd/agents/atomsRobot/Robot2/21/robot2_legs',
+				'/crowd/agents/atomsRobot/Robot2/14/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/2/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/21/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/13/robot2_head',
+				'/crowd/agents/atomsRobot/Robot2/14/robot2_body'
+			}
+		)
+
+		self.assertTrue( "atomsRobot:Robot2:A" in set_names )
+		self.assertTrue( "atomsRobot:Robot2:B" in set_names )
+
+		self.assertTrue( "armsSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "armsSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/arms/robot1_arms'
+
+			}
+		)
+
+		self.assertTrue( "robotSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "robotSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/arms/robot1_arms',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/legs/robot1_legs'
+			}
+		)
+
+		self.assertTrue( "bodySet" in set_names )
+		self.assertEqual(
+			set( obj.set( "bodySet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/body/robot1_body',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/body/robot1_body'
+			}
+		)
+
+		self.assertTrue( "initialShadingGroup" in set_names )
+		self.assertEqual(
+			set( obj.set( "initialShadingGroup" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/flag_group/pPlane1',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pPlane1'
+			}
+		)
+
+		self.assertTrue( "phong3SG" in set_names )
+		self.assertEqual(
+			set( obj.set( "phong3SG" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/flag_group/pole',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/flag_group/pole'
+			}
+		)
+
+		self.assertTrue( "headSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "headSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/head/robot1_head',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/head/robot1_head'
+
+			}
+		)
+
+		self.assertTrue( "legsSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "legsSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/legs/robot1_legs'
+			}
+		)
+
+		self.assertTrue( "fooSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "fooSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/legs/robot1_legs'
+			}
+		)
+
+		self.assertTrue( "newFooSet" in set_names )
+		self.assertEqual(
+			set( obj.set( "newFooSet" ).value.paths() ),
+			{
+				'/crowd/agents/atomsRobot/Robot1/24/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/10/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/17/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/legs/robot1_legs',
+				'/crowd/agents/atomsRobot/Robot1/18/RobotSkin1/legs/robot1_legs'
+			}
+		)
+
 
 if __name__ == "__main__":
 	unittest.main()

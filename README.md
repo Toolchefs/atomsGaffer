@@ -2,7 +2,7 @@
 
 The Tool Chefs have open-sourced their [Atoms Crowd](https://atoms.toolchefs.com) extension for [Gaffer](http://www.gafferhq.org).
 
-> Note : If you are an existing Tool Chefs customer, you will be able to download pre-built AtomsGaffer binaries from the normal Atoms Crowd download page.
+> Note : If you are an existing Tool Chefs customer, please contact Toolchefs at support@toolchefs.com to have a compiled version of AtomsGaffer.
 
 > Caution : This project is still a non-functional work in progress.
 

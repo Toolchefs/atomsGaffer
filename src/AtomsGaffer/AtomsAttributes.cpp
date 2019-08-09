@@ -48,5 +48,5 @@ AtomsAttributes::AtomsAttributes( const std::string &name )
 {
     Gaffer::CompoundDataPlug *attributes = attributesPlug();
 
-    attributes->addOptionalMember( "user:atoms:tint", new Color3fData(), "tint", Gaffer::Plug::Default, false );
+    attributes->addChild( new Gaffer::NameValuePlug( "user:atoms:tint", new IECore::Color3fData(), false, "tint" ) );
 }

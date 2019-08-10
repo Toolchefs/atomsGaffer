@@ -447,6 +447,18 @@ void AtomsCrowdReader::affects( const Plug *input, AffectedPlugsContainer &outpu
 	}
 }
 
+Gaffer::ValuePlug::CachePolicy AtomsCrowdReader::computeCachePolicy( const Gaffer::ValuePlug *output ) const
+{
+	if( output == enginePlug() )
+	{
+		// Request blocking compute for the engine, to avoid concurrent threads
+		// loading the same engine redundantly.
+		return ValuePlug::CachePolicy::Standard;
+	}
+
+	return ObjectSource::computeCachePolicy( output );
+}
+
 void AtomsCrowdReader::hashSource( const Gaffer::Context *context, MurmurHash &h ) const
 {
 	atomsSimFilePlug()->hash( h );

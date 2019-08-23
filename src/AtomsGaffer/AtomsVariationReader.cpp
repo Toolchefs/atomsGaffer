@@ -1007,6 +1007,18 @@ void AtomsVariationReader::affects( const Plug *input, AffectedPlugsContainer &o
     SceneNode::affects( input, outputs );
 }
 
+Gaffer::ValuePlug::CachePolicy AtomsVariationReader::computeCachePolicy( const Gaffer::ValuePlug *output ) const
+{
+	if( output == enginePlug() )
+	{
+		// Request blocking compute for the engine, to avoid concurrent threads
+        // loading the same engine redundantly.
+		return ValuePlug::CachePolicy::Standard;
+	}
+
+	return SceneNode::computeCachePolicy( output );
+}
+
 void AtomsVariationReader::hashBound( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashBound( path, context, parent, h );

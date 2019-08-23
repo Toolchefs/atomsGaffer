@@ -1,0 +1,60 @@
+parameters:
+  name: ''
+  vmImage: ''
+  container: ''
+  buildType: 'RELEASE'
+  threads: 2
+  atoms: ''
+  gaffer: ''
+
+jobs:
+
+ - job: ${{ parameters.name }}_${{ parameters.buildType }}
+
+   timeoutInMinutes: 360
+
+   ${{ if ne(parameters.container, '') }}:
+      container: ${{ parameters.container }}
+
+   pool:
+     vmImage: ${{ parameters.vmImage }}
+
+   variables:
+     BUILD_TYPE: ${{ parameters.buildType }}
+
+   steps:
+
+   # Provides $(AtomsGaffer.*) variables
+   - script: |
+       ./config/azure/setBuildVars.py
+     displayName: 'Set Custom Variables'
+
+   - script: |
+       python ./config/installDependencies.py ${{ parameters.atoms }} ${{ parameters.gaffer }}
+     displayName: 'Install Dependencies'
+     env:
+      AZURE=1
+
+   - script: |
+       Xvfb :99 -screen 0 1280x1024x24 &
+       metacity&
+     displayName: 'Start X (Linux)'
+     condition: and( succeeded(), eq( variables['Agent.OS'], 'Linux' ) )
+     env:
+       DISPLAY: :99.0
+
+   - script: |
+       g++ --version
+       cmake -DGAFFER_ROOT=./artifacts/gaffer -DATOMS_ROOT=./artifacts/atoms -DCMAKE_INSTALL_PREFIX=./artifacts/atomsGaffer .
+       make install -j ${{ parameters.threads }}
+     displayName: 'Build'
+     env:
+       DISPLAY: :99.0
+       AZURE: 1
+
+   - script: |
+       env GAFFER_EXTENSION_PATHS=./artifacts/atomsGaffer ./artifacts/gaffer/bin/gaffer test AtomsGafferTest AtomsGafferUITest
+     displayName: 'Test'
+     env:
+       DISPLAY: :99.0
+       AZURE: 1

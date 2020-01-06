@@ -5,7 +5,7 @@ option( USE_GAFFER_DEPENDENCIES "Turn this off you're building against your own 
 option( USE_ATOMS_PROCEDURAL "Turn this off you plan to load AtomsGaffer in maya or another environment that requires a full atoms license" ON )
 
 set(CMAKE_CXX_STANDARD 11)
-set(CMAKE_VERBOSE_MAKEFILE OFF)
+set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(ATOMS_MAYA_ROOT)
     set(ATOMS_INCLUDE_PATH ${ATOMS_MAYA_ROOT}/include)

@@ -4,7 +4,6 @@ project(AtomsGaffer)
 option( USE_GAFFER_DEPENDENCIES "Turn this off you're building against your own dependencies (eg boost, python, tbb, exr, cortex) rather than the versions included with Gaffer" ON )
 option( USE_ATOMS_PROCEDURAL "Turn this off you plan to load AtomsGaffer in maya or another environment that requires a full atoms license" ON )
 
-set(CMAKE_CXX_STANDARD 11)
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
 if(ATOMS_MAYA_ROOT)

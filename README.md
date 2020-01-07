@@ -12,6 +12,7 @@ The Tool Chefs have open-sourced their [Atoms Crowd](https://atoms.toolchefs.com
 
 * cmake
 * Gaffer Install
+* Atoms Install
 
 **In a terminal:**
 
@@ -21,8 +22,8 @@ setenv ATOMS_ROOT <atoms install path>
 setenv ATOMSGAFFER_INSTALL_PREFIX <your desired install path>
 
 cd atomsGaffer
-cmake -DGAFFER_ROOT=$GAFFER_ROOT -D$ATOMS_ROOT -DCMAKE_INSTALL_PREFIX=$ATOMSGAFFER_INSTALL_PREFIX .
-make install -j <num cores>
+cmake -DGAFFER_ROOT=$GAFFER_ROOT -DATOMS_ROOT=$ATOMS_ROOT -DCMAKE_CXX_FLAGS='-std=c++11' -DCMAKE_INSTALL_PREFIX=$ATOMSGAFFER_INSTALL_PREFIX .
+make install -j <num cores>)
 ```
 
 ### Runtime Instructions

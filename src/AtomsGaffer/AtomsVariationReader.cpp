@@ -1023,7 +1023,7 @@ void AtomsVariationReader::hashBound( const ScenePath &path, const Gaffer::Conte
 {
 	SceneNode::hashBound( path, context, parent, h );
 
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -1085,7 +1085,7 @@ void AtomsVariationReader::hashTransform( const ScenePath &path, const Gaffer::C
         const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashTransform( path, context, parent, h );
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -1147,7 +1147,7 @@ Imath::M44f AtomsVariationReader::computeTransform( const ScenePath &path, const
 void AtomsVariationReader::hashAttributes( const ScenePath &path, const Gaffer::Context *context, const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashAttributes( path, context, parent, h );
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 
 	h.append( &path.front(), path.size() );
@@ -1369,7 +1369,7 @@ void AtomsVariationReader::hashObject( const ScenePath &path, const Gaffer::Cont
         const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashObject( path, context, parent, h );
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
     generatePrefPlug()->hash( h );
     generateNrefPlug()->hash( h );
@@ -1461,7 +1461,7 @@ void AtomsVariationReader::hashChildNames( const ScenePath &path, const Gaffer::
         const ScenePlug *parent, IECore::MurmurHash &h ) const
 {
 	SceneNode::hashChildNames( path, context, parent, h );
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 	h.append( &path.front(), path.size() );
 }
@@ -1526,7 +1526,7 @@ void AtomsVariationReader::hashSetNames( const Gaffer::Context *context, const S
 {
 	SceneNode::hashSetNames( context, parent, h );
 
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 }
 
@@ -1593,7 +1593,7 @@ void AtomsVariationReader::hashSet( const IECore::InternedString &setName, const
 {
 	SceneNode::hashSet( setName, context, parent, h );
 
-    atomsVariationFilePlug()->hash( h );
+	h.append( atomsVariationFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 	h.append( setName );
 }
@@ -1706,7 +1706,7 @@ void AtomsVariationReader::hash( const Gaffer::ValuePlug *output, const Gaffer::
 {
 	if( output == enginePlug() )
 	{
-        atomsVariationFilePlug()->hash( h );
+		h.append( atomsVariationFilePlug()->getValue() );
 		refreshCountPlug()->hash( h );
 	}
 

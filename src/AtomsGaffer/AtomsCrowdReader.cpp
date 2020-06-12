@@ -461,7 +461,7 @@ Gaffer::ValuePlug::CachePolicy AtomsCrowdReader::computeCachePolicy( const Gaffe
 
 void AtomsCrowdReader::hashSource( const Gaffer::Context *context, MurmurHash &h ) const
 {
-	atomsSimFilePlug()->hash( h );
+	h.append( atomsSimFilePlug()->getValue() );
 	refreshCountPlug()->hash( h );
 	timeOffsetPlug()->hash( h );
     agentIdsPlug()->hash( h );
@@ -632,7 +632,8 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
 
 void AtomsCrowdReader::hashAttributes( const ScenePath &path, const Gaffer::Context *context, const GafferScene::ScenePlug *parent, IECore::MurmurHash &h ) const
 {
-    atomsSimFilePlug()->hash( h );
+    GafferScene::ObjectSource::hashAttributes( path, context, parent, h );
+    h.append( atomsSimFilePlug()->getValue() );
     refreshCountPlug()->hash( h );
     timeOffsetPlug()->hash( h );
     agentIdsPlug()->hash( h );
@@ -775,9 +776,10 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
 void AtomsCrowdReader::hash( const Gaffer::ValuePlug *output, const Gaffer::Context *context, IECore::MurmurHash &h ) const
 {
+    ObjectSource::hash( output, context, h );
     if( output == enginePlug() )
     {
-        atomsSimFilePlug()->hash( h );
+        h.append( atomsSimFilePlug()->getValue() );
         refreshCountPlug()->hash( h );
         timeOffsetPlug()->hash( h );
         agentIdsPlug()->hash( h );
@@ -789,7 +791,6 @@ void AtomsCrowdReader::hash( const Gaffer::ValuePlug *output, const Gaffer::Cont
         enginePlug()->hash( h );
         h.append( context->getFrame() );
     }
-    ObjectSource::hash( output, context, h );
 }
 
 void AtomsCrowdReader::compute( Gaffer::ValuePlug *output, const Gaffer::Context *context ) const

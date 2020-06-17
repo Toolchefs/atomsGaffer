@@ -718,7 +718,7 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
         }
 
         // Need to find with point has the data of the current agent
-        std::vector<int> agentIdVec = agentIdData->readable();
+        const std::vector<int> &agentIdVec = agentIdData->readable();
         for ( size_t i = 0; i < agentIdVec.size(); ++i )
         {
             if ( agentIdVec[i] == currentAgentIndex )
@@ -902,7 +902,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
 
     // Get the point id that contain the agent data
     // We need this only to get blend shapes weights information
-    std::vector<int> agentIdVec = agentIdData->readable();
+    const std::vector<int> &agentIdVec = agentIdData->readable();
 
     for ( size_t i = 0; i < agentIdVec.size(); ++i )
     {
@@ -1163,9 +1163,6 @@ ConstPathMatcherDataPtr AtomsCrowdGenerator::computeBranchSet( const ScenePath &
 	for( const auto &agentName : agentNames->readable() )
 	{
 		agentPath.back() = agentName;
-
-        std::vector<std::string> paths;
-        inputSet->readable().paths( paths );
 
 		PathMatcher instanceSet = inputSet->readable().subTree( agentPath );
 		auto variationNamesData = instanceChildNames->member<CompoundData>( agentName );

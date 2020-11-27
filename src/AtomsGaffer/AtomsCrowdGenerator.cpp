@@ -139,62 +139,12 @@ void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &ou
 	if(
 		input == inPlug()->objectPlug() ||
         input == inPlug()->attributesPlug() ||
-		input == variationsPlug()->childNamesPlug()
+		input == variationsPlug()->childNamesPlug() ||
+        input == useInstancesPlug()
 	)
 	{
 		outputs.push_back( agentChildNamesPlug() );
 	}
-
-	if(
-		input == namePlug() ||
-		input == agentChildNamesPlug() ||
-		input == variationsPlug()->childNamesPlug()
-	)
-	{
-		outputs.push_back( outPlug()->childNamesPlug() );
-	}
-
-	if(
-		input == inPlug()->objectPlug() ||
-		input == inPlug()->attributesPlug() ||
-		input == namePlug() ||
-		input == variationsPlug()->boundPlug() ||
-		input == variationsPlug()->transformPlug() ||
-		input == agentChildNamesPlug() ||
-		input == boundingBoxPaddingPlug() ||
-		input == clothCachePlug()->objectPlug()
-	)
-	{
-		outputs.push_back( outPlug()->boundPlug() );
-	}
-
-	if(
-		input == inPlug()->objectPlug() ||
-		input == inPlug()->attributesPlug() ||
-		input == variationsPlug()->transformPlug()
-	)
-	{
-		outputs.push_back( outPlug()->transformPlug() );
-	}
-
-	if(
-		input == variationsPlug()->attributesPlug() ||
-		input == inPlug()->objectPlug() ||
-		input == inPlug()->attributesPlug()
-	)
-	{
-		outputs.push_back( outPlug()->attributesPlug() );
-	}
-
-    if( input == variationsPlug()->objectPlug() ||
-        input == variationsPlug()->attributesPlug() ||
-        input == inPlug()->objectPlug() ||
-        input == inPlug()->attributesPlug() ||
-        input == clothCachePlug()->objectPlug()
-        )
-    {
-        outputs.push_back( outPlug()->objectPlug() );
-    }
 }
 
 void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::Context *context, MurmurHash &h ) const
@@ -371,6 +321,19 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 	BranchCreator::compute( output, context );
 }
 
+bool AtomsCrowdGenerator::affectsBranchBound( const Gaffer::Plug *input ) const
+{
+	return ( input == inPlug()->objectPlug() ||
+			 input == inPlug()->attributesPlug() ||
+			 input == inPlug()->boundPlug() ||
+			 input == namePlug() ||
+			 input == variationsPlug()->boundPlug() ||
+			 input == variationsPlug()->transformPlug() ||
+			 input == agentChildNamesPlug() ||
+			 input == boundingBoxPaddingPlug() ||
+			 input == clothCachePlug()->objectPlug() );
+}
+
 void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
 	if( branchPath.size() < 4 )
@@ -518,6 +481,13 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
     }
 }
 
+bool AtomsCrowdGenerator::affectsBranchTransform( const Gaffer::Plug *input ) const
+{
+	return ( input == inPlug()->objectPlug() ||
+			 input == inPlug()->attributesPlug() ||
+			 input == variationsPlug()->transformPlug() );
+}
+
 void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
 
@@ -563,6 +533,13 @@ Imath::M44f AtomsCrowdGenerator::computeBranchTransform( const ScenePath &parent
 		AgentScope scope( context, branchPath );
 		return variationsPlug()->transformPlug()->getValue();
 	}
+}
+
+bool AtomsCrowdGenerator::affectsBranchAttributes( const Gaffer::Plug *input ) const
+{
+	return ( input == variationsPlug()->attributesPlug() ||
+			 input == inPlug()->objectPlug() ||
+			 input == inPlug()->attributesPlug() );
 }
 
 void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
@@ -842,6 +819,16 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 	}
 }
 
+bool AtomsCrowdGenerator::affectsBranchObject( const Gaffer::Plug *input ) const
+{
+	return ( input == variationsPlug()->objectPlug() ||
+			 input == variationsPlug()->attributesPlug() ||
+			 input == inPlug()->objectPlug() ||
+			 input == inPlug()->attributesPlug() ||
+			 input == clothCachePlug()->objectPlug() ||
+			 input == useInstancesPlug() );
+}
+
 void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
 	if( branchPath.size() <= 4 )
@@ -1030,6 +1017,13 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
     return result;
 }
 
+bool AtomsCrowdGenerator::affectsBranchChildNames( const Gaffer::Plug *input ) const
+{
+	return ( input == namePlug() ||
+			 input == agentChildNamesPlug() ||
+			 input == variationsPlug()->childNamesPlug() );
+}
+
 void AtomsCrowdGenerator::hashBranchChildNames( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
 	if( branchPath.empty() )
@@ -1128,6 +1122,11 @@ ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchChildNames( c
 	}
 }
 
+bool AtomsCrowdGenerator::affectsBranchSetNames( const Gaffer::Plug *input ) const
+{
+	return ( input == variationsPlug()->setNamesPlug() );
+}
+
 void AtomsCrowdGenerator::hashBranchSetNames( const ScenePath &parentPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
 	h = variationsPlug()->setNamesPlug()->hash();
@@ -1136,6 +1135,14 @@ void AtomsCrowdGenerator::hashBranchSetNames( const ScenePath &parentPath, const
 ConstInternedStringVectorDataPtr AtomsCrowdGenerator::computeBranchSetNames( const ScenePath &parentPath, const Gaffer::Context *context ) const
 {
 	return variationsPlug()->setNamesPlug()->getValue();
+}
+
+bool AtomsCrowdGenerator::affectsBranchSet( const Gaffer::Plug *input ) const
+{
+	return ( input == variationsPlug()->childNamesPlug() ||
+			 input == agentChildNamesPlug() ||
+			 input == variationsPlug()->setPlug() ||
+			 input == namePlug() );
 }
 
 void AtomsCrowdGenerator::hashBranchSet( const ScenePath &parentPath, const InternedString &setName, const Gaffer::Context *context, MurmurHash &h ) const

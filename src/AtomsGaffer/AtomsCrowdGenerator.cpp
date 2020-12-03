@@ -136,12 +136,7 @@ void AtomsCrowdGenerator::affects( const Plug *input, AffectedPlugsContainer &ou
 {
 	BranchCreator::affects( input, outputs );
 
-	if(
-		input == inPlug()->objectPlug() ||
-        input == inPlug()->attributesPlug() ||
-		input == variationsPlug()->childNamesPlug() ||
-        input == useInstancesPlug()
-	)
+	if( input == inPlug()->objectPlug() )
 	{
 		outputs.push_back( agentChildNamesPlug() );
 	}
@@ -154,9 +149,6 @@ void AtomsCrowdGenerator::hash( const Gaffer::ValuePlug *output, const Gaffer::C
 	if( output == agentChildNamesPlug() )
 	{
 		inPlug()->objectPlug()->hash( h );
-        inPlug()->attributesPlug()->hash( h );
-		h.append( variationsPlug()->childNamesHash( ScenePath() ) );
-		useInstancesPlug()->hash( h );
 	}
 }
 
@@ -323,13 +315,9 @@ void AtomsCrowdGenerator::compute( Gaffer::ValuePlug *output, const Gaffer::Cont
 
 bool AtomsCrowdGenerator::affectsBranchBound( const Gaffer::Plug *input ) const
 {
-	return ( input == inPlug()->objectPlug() ||
-			 input == inPlug()->attributesPlug() ||
-			 input == inPlug()->boundPlug() ||
+	return ( input == inPlug()->attributesPlug() ||
 			 input == namePlug() ||
-			 input == variationsPlug()->boundPlug() ||
 			 input == variationsPlug()->transformPlug() ||
-			 input == agentChildNamesPlug() ||
 			 input == boundingBoxPaddingPlug() ||
 			 input == clothCachePlug()->objectPlug() );
 }
@@ -348,32 +336,19 @@ void AtomsCrowdGenerator::hashBranchBound( const ScenePath &parentPath, const Sc
 		h = hashOfTransformedChildBounds( path, outPlug() );
 	}
 
-	else if( branchPath.size() == 4 )
+	else if( branchPath.size() >= 4 )
 	{
 		// "/agents/<agentType>/<variation>/<id>"
 		BranchCreator::hashBranchBound( parentPath, branchPath, context, h );
 
 		inPlug()->attributesPlug()->hash( h );
-        inPlug()->objectPlug()->hash( h );
         boundingBoxPaddingPlug()->hash( h );
-		agentChildNamesHash( parentPath, context, h );
+		clothCachePlug()->objectPlug()->hash( h );
 		h.append( branchPath.back() );
 		{
 			AgentScope scope( context, branchPath );
 			variationsPlug()->transformPlug()->hash( h );
-			variationsPlug()->boundPlug()->hash( h );
 		}
-	}
-	else
-	{
-		// "/agents/<agentType>/<variation>/<id>/..."
-        clothCachePlug()->objectPlug()->hash( h );
-		AgentScope instanceScope( context, branchPath );
-		variationsPlug()->boundPlug()->hash( h );
-        boundingBoxPaddingPlug()->hash( h );
-        inPlug()->boundPlug()->hash( h );
-        inPlug()->attributesPlug()->hash( h );
-        inPlug()->objectPlug()->hash( h );
 	}
 }
 
@@ -483,8 +458,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
 
 bool AtomsCrowdGenerator::affectsBranchTransform( const Gaffer::Plug *input ) const
 {
-	return ( input == inPlug()->objectPlug() ||
-			 input == inPlug()->attributesPlug() ||
+	return ( input == inPlug()->attributesPlug() ||
 			 input == variationsPlug()->transformPlug() );
 }
 
@@ -499,7 +473,6 @@ void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, cons
 	else if( branchPath.size() == 4 )
 	{
 		// "/agents/<agentType>/<variation>/<id>"
-		inPlug()->objectPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
 		h.append( branchPath[3] );
 	}
@@ -508,8 +481,6 @@ void AtomsCrowdGenerator::hashBranchTransform( const ScenePath &parentPath, cons
 		// "/agents/<agentType>/<variation>/<id>/..."
 		AgentScope scope( context, branchPath );
 		variationsPlug()->transformPlug()->hash( h );
-		inPlug()->attributesPlug()->hash( h );
-        inPlug()->objectPlug()->hash( h );
         h.append( branchPath[3] );
 	}
 }
@@ -544,7 +515,7 @@ bool AtomsCrowdGenerator::affectsBranchAttributes( const Gaffer::Plug *input ) c
 
 void AtomsCrowdGenerator::hashBranchAttributes( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
 {
-	if( branchPath.size() < 1 )
+	if( branchPath.size() < 2 )
 	{
         // "/" or "/agents"
 		h = outPlug()->attributesPlug()->defaultValue()->Object::hash();
@@ -823,6 +794,7 @@ bool AtomsCrowdGenerator::affectsBranchObject( const Gaffer::Plug *input ) const
 {
 	return ( input == variationsPlug()->objectPlug() ||
 			 input == variationsPlug()->attributesPlug() ||
+			 input == variationsPlug()->transformPlug() ||
 			 input == inPlug()->objectPlug() ||
 			 input == inPlug()->attributesPlug() ||
 			 input == clothCachePlug()->objectPlug() ||
@@ -842,6 +814,7 @@ void AtomsCrowdGenerator::hashBranchObject( const ScenePath &parentPath, const S
         clothCachePlug()->objectPlug()->hash( h );
         AgentScope instanceScope( context, branchPath );
         variationsPlug()->objectPlug()->hash( h );
+        variationsPlug()->transformPlug()->hash( h );
         inPlug()->attributesPlug()->hash( h );
         inPlug()->objectPlug()->hash( h );
 		atomsPoseHash( parentPath, branchPath, context, h );

@@ -97,6 +97,8 @@ const IntPlug* AtomsCrowdClothReader::refreshCountPlug() const
 
 void AtomsCrowdClothReader::affects( const Plug *input, AffectedPlugsContainer &outputs ) const
 {
+    SceneProcessor::affects(input, outputs);
+
     if( input == inPlug()->objectPlug() || input == inPlug()->attributesPlug() ||
         input == atomsClothFilePlug() || input == refreshCountPlug() )
     {

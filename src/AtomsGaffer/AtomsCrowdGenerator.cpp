@@ -1481,7 +1481,7 @@ void AtomsCrowdGenerator::applySkinDeformer(
             newN += currentNormal * jointWeightsVec[offset] * worldMatrices[jointId];
         }
 
-        newN *= transfromNormalMatrix;
+        newN *= transfromNormalInverseMatrix;
 
         inNormal.x = newN.x;
         inNormal.y = newN.y;

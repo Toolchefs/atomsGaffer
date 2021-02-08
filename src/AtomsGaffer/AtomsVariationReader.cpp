@@ -61,6 +61,7 @@
 #include "AtomsCore/Metadata/StringArrayMetadata.h"
 #include "AtomsCore/Metadata/BoolArrayMetadata.h"
 
+#include <tbb/tbb.h>
 #include <list>
 
 IE_CORE_DEFINERUNTIMETYPED( AtomsGaffer::AtomsVariationReader );
@@ -744,22 +745,43 @@ public :
     void loadAgentTypeMesh( Atoms::AgentTypeVariationCPtr agentTypePtr, const std::string& agentTypeName )
     {
         auto geoNames = agentTypePtr->getGeometryNames();
+        size_t nbGeos = geoNames.size();
+
+        std::vector<AtomsPtr<AtomsCore::MapMetadata>> atomsMeshes(nbGeos);
+        std::vector<Atoms::VariationGeometryCPtr> atomsGeoPtrs(nbGeos, nullptr);
+
+        // Load atoms meshes in parallel
+        tbb::blocked_range<size_t> tbb_range(0, nbGeos, 1);
+        tbb::parallel_for(tbb_range, [&](const tbb::blocked_range<size_t>& range) {
+            for (size_t geoId = range.begin(); geoId < range.end(); ++geoId)
+            {
+                auto geoPtr = agentTypePtr->getGeometryPtr( geoNames[geoId] );
+                if ( !geoPtr )
+                    continue;
+
+                if ( geoPtr->getGeometryFile().find(".groom") != std::string::npos )
+                    continue;
+
+                auto inGeoMap = Atoms::loadMesh( geoPtr->getGeometryFile(), geoPtr->getGeometryFilter() );
+                if ( !inGeoMap )
+                {
+                    throw InvalidArgumentException( "AtomsVariationsReader: Invalid geo: " +
+                                                    geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter() );
+                }
+
+                atomsMeshes[geoId] = inGeoMap;
+                atomsGeoPtrs[geoId] = geoPtr;
+            }
+        });
+
+        // Process loaded meshes
         for ( size_t geoId = 0; geoId != geoNames.size(); ++geoId )
         {
-            auto geoPtr = agentTypePtr->getGeometryPtr( geoNames[geoId] );
-            if ( !geoPtr )
+            auto inGeoMap = atomsMeshes[geoId];
+            if (!inGeoMap)
                 continue;
 
-            if ( geoPtr->getGeometryFile().find(".groom") != std::string::npos )
-                continue;
-
-            auto inGeoMap = Atoms::loadMesh( geoPtr->getGeometryFile(), geoPtr->getGeometryFilter() );
-            if ( !inGeoMap )
-            {
-                throw InvalidArgumentException( "AtomsVariationsReader: Invalid geo: " +
-                geoPtr->getGeometryFile() +":" + geoPtr->getGeometryFilter() );
-            }
-
+            auto geoPtr = atomsGeoPtrs[geoId];
             auto* agentTypeRoot = &m_root.children[agentTypeName];
             AtomsPtr<AtomsCore::MapMetadata> atomsGeoMap( new AtomsCore::MapMetadata );
             flatMeshHierarchy(inGeoMap.get(), atomsGeoMap, agentTypeRoot);

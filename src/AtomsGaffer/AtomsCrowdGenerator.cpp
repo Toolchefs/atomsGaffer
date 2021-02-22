@@ -878,7 +878,6 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
     }
     else
     {
-        std::cout << "Index did not match... Doing a linear search!" << std::endl;
         for ( size_t i = 0; i < agentIdVec.size(); ++i )
         {
             if ( agentIdVec[i] == currentAgentIndex )

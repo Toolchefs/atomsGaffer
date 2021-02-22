@@ -751,8 +751,7 @@ public :
         std::vector<Atoms::VariationGeometryCPtr> atomsGeoPtrs(nbGeos, nullptr);
 
         // Load atoms meshes in parallel
-        tbb::blocked_range<size_t> tbb_range(0, nbGeos, 1);
-        tbb::parallel_for(tbb_range, [&](const tbb::blocked_range<size_t>& range) {
+        auto loadGeoMeshesFunc = [&](const tbb::blocked_range<size_t>& range) {
             for (size_t geoId = range.begin(); geoId < range.end(); ++geoId)
             {
                 auto geoPtr = agentTypePtr->getGeometryPtr( geoNames[geoId] );
@@ -772,7 +771,11 @@ public :
                 atomsMeshes[geoId] = inGeoMap;
                 atomsGeoPtrs[geoId] = geoPtr;
             }
-        });
+        };
+
+        tbb::task_group_context taskGroupContext(tbb::task_group_context::isolated);
+        tbb::blocked_range<size_t> tbb_range(0, nbGeos, 1);
+        tbb::parallel_for(tbb_range, loadGeoMeshesFunc, taskGroupContext);
 
         // Process loaded meshes
         for ( size_t geoId = 0; geoId != geoNames.size(); ++geoId )
@@ -1035,7 +1038,7 @@ Gaffer::ValuePlug::CachePolicy AtomsVariationReader::computeCachePolicy( const G
 	{
 		// Request blocking compute for the engine, to avoid concurrent threads
         // loading the same engine redundantly.
-		return ValuePlug::CachePolicy::Standard;
+		return ValuePlug::CachePolicy::TaskCollaboration;
 	}
 
 	return SceneNode::computeCachePolicy( output );

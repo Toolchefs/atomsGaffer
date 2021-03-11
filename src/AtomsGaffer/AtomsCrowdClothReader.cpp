@@ -35,6 +35,7 @@
 //////////////////////////////////////////////////////////////////////////
 
 #include "AtomsGaffer/AtomsCrowdClothReader.h"
+#include "AtomsGaffer/AtomsMathTranaslator.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
@@ -214,8 +215,15 @@ ConstObjectPtr AtomsCrowdClothReader::computeObject( const ScenePath &path, cons
             Box3dDataPtr bbox = new Box3dData;
             StringDataPtr stackOrder = new StringData;
 
-            cache.loadAgentClothMesh( frame, agentId, meshName, p->writable(), n->writable() );
-            cache.loadAgentClothMeshBoundingBox( frame, agentId, meshName, bbox->writable() );
+            std::vector<AtomsCore::Vector3> clothPoints, clothNormals;
+            AtomsCore::Box3 clothBound;
+            cache.loadAgentClothMesh( frame, agentId, meshName, clothPoints, clothNormals );
+            cache.loadAgentClothMeshBoundingBox( frame, agentId, meshName, clothBound );
+
+            convertFromAtoms( p->writable(), clothPoints );
+            convertFromAtoms( n->writable(), clothNormals );
+            convertFromAtoms( bbox->writable(), clothBound );
+
             stackOrder->writable() = cache.getAgentClothMeshStackOrder( frame, agentId, meshName );
             meshData[ "P" ] = p;
             meshData[ "N" ] = n;

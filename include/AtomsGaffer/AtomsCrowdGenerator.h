@@ -156,6 +156,7 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		struct AgentScope : public Gaffer::Context::EditableScope
 		{
 			AgentScope( const Gaffer::Context *context, const ScenePath &branchPath );
+			ScenePath m_agentPath;
 		};
 
 		static size_t g_firstPlugIndex;

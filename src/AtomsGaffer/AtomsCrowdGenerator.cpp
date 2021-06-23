@@ -373,7 +373,7 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         Imath::Box3d agentClothBBox;
 		ConstCompoundObjectPtr crowd;
 		{
-			ScenePlug::PathScope scope( context, parentPath );
+			ScenePlug::PathScope scope( context, &parentPath );
 			crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
             agentClothBBox = agentClothBoudingBox( parentPath, branchPath );
 		}
@@ -644,7 +644,7 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
         int currentAgentIndex = std::atoi( branchPath[3].string().c_str() );
 
         int agentIdPointIndex = -1;
-        ScenePlug::PathScope scope( context, parentPath );
+        ScenePlug::PathScope scope( context, &parentPath );
         auto points = runTimeCast<const PointsPrimitive>( inPlug()->objectPlug()->getValue() );
 
         if ( !points )
@@ -836,7 +836,7 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
     int agentIdPointIndex = -1;
     auto& pointVariablesData = pointVariables.writable();
     {
-        ScenePlug::PathScope scope(context, parentPath);
+        ScenePlug::PathScope scope(context, &parentPath);
         points = runTimeCast<const PointsPrimitive>(inPlug()->objectPlug()->getValue());
     }
 
@@ -1178,31 +1178,30 @@ ConstPathMatcherDataPtr AtomsCrowdGenerator::computeBranchSet( const ScenePath &
 
 IECore::ConstCompoundDataPtr AtomsCrowdGenerator::agentChildNames( const ScenePath &parentPath, const Gaffer::Context *context ) const
 {
-	ScenePlug::PathScope scope( context, parentPath );
+	ScenePlug::PathScope scope( context, &parentPath );
 	return agentChildNamesPlug()->getValue();
 }
 
 void AtomsCrowdGenerator::agentChildNamesHash( const ScenePath &parentPath, const Gaffer::Context *context, IECore::MurmurHash &h ) const
 {
-	ScenePlug::PathScope scope( context, parentPath );
+	ScenePlug::PathScope scope( context, &parentPath );
 	agentChildNamesPlug()->hash( h );
 }
 
 AtomsCrowdGenerator::AgentScope::AgentScope( const Gaffer::Context *context, const ScenePath &branchPath )
 	:	EditableScope( context )
 {
-	ScenePath agentPath;
-	agentPath.reserve( 1 + ( branchPath.size() > 4 ? branchPath.size() - 4 : 0 ) );
+    m_agentPath.reserve( 1 + ( branchPath.size() > 4 ? branchPath.size() - 4 : 0 ) );
     if( branchPath.size() > 1 )
-	    agentPath.push_back( branchPath[1] );
+        m_agentPath.push_back( branchPath[1] );
     if( branchPath.size() > 2 )
-        agentPath.push_back( branchPath[2] );
+        m_agentPath.push_back( branchPath[2] );
 	if( branchPath.size() > 4 )
 	{
-		agentPath.insert( agentPath.end(), branchPath.begin() + 4, branchPath.end() );
+		m_agentPath.insert( m_agentPath.end(), branchPath.begin() + 4, branchPath.end() );
 	}
 
-	set( ScenePlug::scenePathContextName, agentPath );
+    set( ScenePlug::scenePathContextName, &m_agentPath );
 }
 
 void AtomsCrowdGenerator::atomsPoseHash( const ScenePath &parentPath, const ScenePath &branchPath, const Gaffer::Context *context, MurmurHash &h ) const
@@ -1646,7 +1645,7 @@ Imath::M44f AtomsCrowdGenerator::agentRootMatrix(
 {
     ConstCompoundObjectPtr crowd;
     {
-        ScenePlug::PathScope scope( context, parentPath );
+        ScenePlug::PathScope scope( context, &parentPath );
         crowd = runTimeCast<const CompoundObject>( inPlug()->attributesPlug()->getValue() );
     }
 

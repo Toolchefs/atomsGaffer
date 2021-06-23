@@ -40,6 +40,8 @@ import imath
 import IECore
 import IECoreScene
 
+import Gaffer
+
 import GafferTest
 import GafferSceneTest
 
@@ -253,11 +255,10 @@ class AtomsCrowdReaderTest( GafferSceneTest.SceneTestCase ) :
 		ss = GafferTest.CapturingSlot( a.plugDirtiedSignal() )
 
 		a["name"].setValue( "army" )
-		self.assertEqual( len( ss ), 4 )
-		self.failUnless( ss[0][0].isSame( a["name"] ) )
-		self.failUnless( ss[1][0].isSame( a["out"]["childNames"] ) )
-		self.failUnless( ss[2][0].isSame( a["out"]["set"] ) )
-		self.failUnless( ss[3][0].isSame( a["out"] ) )
+		if Gaffer.About.compatibilityVersion() < 60 :
+			self.assertEqual( len( ss ), 4 )
+		else :
+			self.assertEqual( len( ss ), 7 )
 
 		del ss[:]
 

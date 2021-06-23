@@ -78,6 +78,18 @@ Gaffer.Metadata.registerNode(
 
         ],
 
+        "destination" : [
+
+            "description",
+            """
+            The location where the agents will be placed in the output scene.
+            When the destination is evaluated, the `${scene:path}` variable holds
+            the location of the crowd points, so the default value parents the agents
+            under the points.
+            """
+
+        ],
+
         "variations" : [
 
             "description",

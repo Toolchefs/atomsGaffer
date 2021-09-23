@@ -20,9 +20,10 @@ The Tool Chefs have open-sourced their [Atoms Crowd](https://atoms.toolchefs.com
 setenv GAFFER_ROOT <gaffer install path>
 setenv ATOMS_ROOT <atoms install path>
 setenv ATOMSGAFFER_INSTALL_PREFIX <your desired install path>
+setenv PYTHON_VERSION 2.7
 
 cd atomsGaffer
-cmake -DGAFFER_ROOT=$GAFFER_ROOT -DATOMS_ROOT=$ATOMS_ROOT -DCMAKE_CXX_FLAGS='-std=c++14' -DCMAKE_INSTALL_PREFIX=$ATOMSGAFFER_INSTALL_PREFIX .
+cmake -DGAFFER_ROOT=$GAFFER_ROOT -DATOMS_ROOT=$ATOMS_ROOT -DCMAKE_CXX_FLAGS='-std=c++14' -DPYTHON_VERSION=$PYTHON_VERSION -DCMAKE_INSTALL_PREFIX=$ATOMSGAFFER_INSTALL_PREFIX .
 make install -j <num cores>)
 ```
 

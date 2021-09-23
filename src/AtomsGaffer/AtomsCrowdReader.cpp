@@ -36,6 +36,7 @@
 
 #include "AtomsGaffer/AtomsCrowdReader.h"
 #include "AtomsGaffer/AtomsMetadataTranslator.h"
+#include "AtomsGaffer/AtomsMathTranaslator.h"
 
 #include "IECoreScene/PointsPrimitive.h"
 
@@ -604,14 +605,15 @@ ConstObjectPtr AtomsCrowdReader::computeSource( const Gaffer::Context *context )
                 if ( !matrices.empty() )
                 {
                     auto& pelvisMtx = matrices[0];
-                    positions[i] = pelvisMtx.translation();
-                    rootMatrix[i] = Imath::M44f( pelvisMtx );
-                    orientation[i] = Imath::extractQuat( pelvisMtx );
+                    auto pelvisPosition = pelvisMtx.translation();
+                    convertFromAtoms( positions[i], pelvisPosition );
+                    convertFromAtoms( rootMatrix[i], pelvisMtx );
+                    convertFromAtoms( orientation[i], AtomsMath::extractQuat( pelvisMtx ) );
                 }
             }
             else
             {
-                positions[i] = pose.jointPose( 0 ).translation;
+                convertFromAtoms( positions[i], pose.jointPose( 0 ).translation );
             }
         }
     }
@@ -662,7 +664,9 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
     auto& translator = AtomsMetadataTranslator::instance();
 
     Box3dDataPtr cacheBox = new Box3dData;
-    atomsCache.loadBoundingBox( frame, cacheBox->writable() );
+    AtomsCore::Box3 atomsCacheBox;
+    atomsCache.loadBoundingBox( frame, atomsCacheBox );
+    convertFromAtoms( cacheBox->writable(), atomsCacheBox );
     //members["atoms:boundingBox"] = cacheBox;
 
     IntVectorDataPtr agentIndices = new IntVectorData;
@@ -708,7 +712,7 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
 
             auto& outMatrices = matricesData->writable();
             auto& outNormalMatrices = normalMatricesData->writable();
-            outMatrices = poser.getAllWorldMatrix( posePtr->get() );
+            convertFromAtoms( outMatrices, poser.getAllWorldMatrix( posePtr->get() ) );
             outNormalMatrices.resize( outMatrices.size() );
 
             //update the position metadata
@@ -730,16 +734,19 @@ IECore::ConstCompoundObjectPtr AtomsCrowdReader::computeAttributes( const SceneN
             // Store the matrices for the skinning
             for ( unsigned int j = 0; j < outMatrices.size(); j++ )
             {
-                AtomsCore::Matrix &jMtx = outMatrices[j];
+                auto &jMtx = outMatrices[j];
                 agentBBoxData.extendBy(jMtx.translation());
-                jMtx = bindPosesInv[j] * jMtx;
+                Imath::M44d bindInverseMatrix;
+                convertFromAtoms( bindInverseMatrix, bindPosesInv[j] );
+                jMtx = bindInverseMatrix * jMtx;
                 outNormalMatrices[j] = jMtx.inverse().transpose();
             }
 
             agentCompound["poseWorldMatrices"] = matricesData;
             agentCompound["poseNormalWorldMatrices"] = normalMatricesData;
 
-            M44dDataPtr rootMatrixData = new M44dData( rootMatrix );
+            M44dDataPtr rootMatrixData = new M44dData( );
+            convertFromAtoms( rootMatrixData->writable(), rootMatrix );
             agentCompound["rootMatrix"] = rootMatrixData;
 
             // This is an hash of the agent pose in local space

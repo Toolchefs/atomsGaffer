@@ -36,6 +36,7 @@
 
 #include "AtomsGaffer/AtomsVariationReader.h"
 #include "AtomsGaffer/AtomsMetadataTranslator.h"
+#include "AtomsGaffer/AtomsMathTranaslator.h"
 
 #include "IECoreScene/MeshPrimitive.h"
 #include "IECore/NullObject.h"
@@ -81,8 +82,7 @@ IECoreScene::PrimitiveVariable convertNormals( AtomsUtils::Mesh& mesh )
     V3fVectorDataPtr normalsData = new V3fVectorData;
     normalsData->setInterpretation( GeometricData::Normal );
     auto &normals = normalsData->writable();
-    normals.reserve( inIndices.size() );
-    normals.insert( normals.begin(), inNormals.begin(), inNormals.end() );
+    convertFromAtoms( normals, inNormals );
     return PrimitiveVariable( PrimitiveVariable::FaceVarying, normalsData );
 }
 
@@ -92,7 +92,7 @@ IECoreScene::PrimitiveVariable convertUvs( AtomsUtils::Mesh& mesh, AtomsUtils::M
 
     V2fVectorDataPtr uvData = new V2fVectorData;
     uvData->setInterpretation( GeometricData::UV );
-    uvData->writable() = uvSet.uvs;
+    convertFromAtoms( uvData->writable(), uvSet.uvs );
     IECore::IntVectorDataPtr uvIndicesData = new IECore::IntVectorData;
     auto &uvIndices = uvIndicesData->writable();
     uvIndices.insert( uvIndices.end(), inIndices.begin(), inIndices.end() );
@@ -132,7 +132,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
 
     V3fVectorDataPtr p = new V3fVectorData;
     auto &outP = p->writable();
-    outP = points;
+    convertFromAtoms( outP, points );
 
     MeshPrimitivePtr meshPtr = new MeshPrimitive( verticesPerFace, vertexIds, "linear", p );
 
@@ -164,7 +164,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
     {
         V2fVectorDataPtr uvData = new V2fVectorData;
         uvData->setInterpretation( GeometricData::UV );
-        uvData->writable() = mesh.uvs();
+        convertFromAtoms( uvData->writable(), mesh.uvs() );
 
         meshPtr->variables["uv"] = PrimitiveVariable( PrimitiveVariable::FaceVarying, uvData );
     }
@@ -191,7 +191,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
             normals.reserve( blendN.size() );
             if ( blendN.size() == vertexIndices.size() )
             {
-                normals.insert( normals.begin(), blendN.begin(), blendN.end() );
+                convertFromAtoms( normals, blendN );
             }
             else
             {
@@ -199,7 +199,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
                 normals.resize( vertexIndices.size() );
                 for ( size_t vId = 0; vId < std::min(vertexIndices.size(), blendN.size()); ++vId )
                 {
-                    normals[vId] = blendN[vertexIndices[vId]];
+                    convertFromAtoms( normals[vId], blendN[vertexIndices[vId]] );
                 }
             }
 
@@ -209,7 +209,7 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
             V3fVectorDataPtr blendPointsData = new V3fVectorData;
             auto &blendPts = blendPointsData->writable();
             blendPts.reserve( blendP.size() );
-            blendPts.insert( blendPts.begin(), blendP.begin(), blendP.end() );
+            convertFromAtoms( blendPts, blendP );
             meshPtr->variables["blendShape_" + std::to_string( blendId ) + "_P"] =
                     PrimitiveVariable( PrimitiveVariable::Vertex, blendPointsData );
         }
@@ -1062,7 +1062,9 @@ Imath::Box3f AtomsVariationReader::computeBound( const ScenePath &path, const Ga
                 auto bbox = geoCacheMeshIt->second->getTypedEntry<AtomsCore::Box3Metadata>( "boundingBox" );
                 if ( bbox )
                 {
-                    return Imath::Box3f(bbox->get().min, bbox->get().max);
+                    Imath::Box3f outBox;
+                    convertFromAtoms( outBox, bbox->get() );
+                    return outBox;
                 }
                 else
                 {
@@ -1137,7 +1139,9 @@ Imath::M44f AtomsVariationReader::computeTransform( const ScenePath &path, const
         auto matrixPtr = data->getTypedEntry<const AtomsCore::MatrixMetadata>( "matrix" );
         if ( matrixPtr )
         {
-            return Imath::M44f( matrixPtr->get() );
+            Imath::M44f outMatrix;
+            convertFromAtoms( outMatrix, matrixPtr->get() );
+            return outMatrix;
         }
     }
 
@@ -1767,7 +1771,7 @@ void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh
             for ( size_t uvId = 0; uvId < fillUvsSize; ++uvId )
             {
                 uvData->uvIndices.push_back( uvData->uvs.size() );
-                uvData->uvs.push_back( Imath::V2f( 0.0, 0.0 ) );
+                uvData->uvs.push_back( AtomsCore::Vector2f( 0.0, 0.0 ) );
             }
         }
 
@@ -1788,7 +1792,7 @@ void AtomsVariationReader::mergeUvSets( AtomsUtils::Mesh& mesh, AtomsUtils::Mesh
             size_t fillUvsSize = mesh.normals().size() - uvSet.uvs.size();
             for ( size_t uvId = 0; uvId < fillUvsSize; ++uvId )
             {
-                uvSet.uvs.push_back( Imath::V2f( 0.0, 0.0 ) );
+                uvSet.uvs.push_back( AtomsCore::Vector2f( 0.0, 0.0 ) );
                 uvSet.uvIndices.push_back( uvSet.uvs.size() );
             }
         }

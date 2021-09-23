@@ -57,7 +57,7 @@ class AtomsCrowdGenerator : public GafferScene::BranchCreator
 		AtomsCrowdGenerator( const std::string &name = defaultName<AtomsCrowdGenerator>() );
 		~AtomsCrowdGenerator() = default;
 
-		IE_CORE_DECLARERUNTIMETYPEDEXTENSION( AtomsGaffer::AtomsCrowdGenerator, TypeId::AtomsCrowdGeneratorTypeId, GafferScene::BranchCreator );
+		GAFFER_NODE_DECLARE_TYPE( AtomsGaffer::AtomsCrowdGenerator, TypeId::AtomsCrowdGeneratorTypeId, GafferScene::BranchCreator );
 
 		Gaffer::StringPlug *namePlug();
 		const Gaffer::StringPlug *namePlug() const;

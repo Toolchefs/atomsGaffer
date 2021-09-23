@@ -2,7 +2,6 @@ cmake_minimum_required(VERSION 3.0)
 project(AtomsGaffer)
 
 option( USE_GAFFER_DEPENDENCIES "Turn this off you're building against your own dependencies (eg boost, python, tbb, exr, cortex) rather than the versions included with Gaffer" ON )
-option( USE_ATOMS_PROCEDURAL "Turn this off you plan to load AtomsGaffer in maya or another environment that requires a full atoms license" ON )
 
 set(CMAKE_VERBOSE_MAKEFILE ON)
 
@@ -40,21 +39,17 @@ set(DEPENDENCY_INCLUDE_PATHS
 file( GLOB AtomsGafferSrc src/AtomsGaffer/*.cpp )
 link_directories( AtomsGaffer ${GAFFER_ROOT}/lib ${ATOMS_LIB_PATH} )
 add_library( AtomsGaffer SHARED ${AtomsGafferSrc} )
-target_compile_definitions( AtomsGaffer PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
+target_compile_definitions( AtomsGaffer PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 _GLIBCXX_USE_CXX11_ABI=0)
 target_include_directories( AtomsGaffer SYSTEM PRIVATE ${DEPENDENCY_INCLUDE_PATHS} )
 target_include_directories( AtomsGaffer PRIVATE include )
-if(USE_ATOMS_PROCEDURAL)
-	target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsProcedural )
-else()
-	target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsCore AtomsGraph Atoms AtomsUtils )
-endif()
+target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsCore AtomsGraph Atoms AtomsUtils )
 install( TARGETS AtomsGaffer DESTINATION lib )
 
 # build the python bindings
 file( GLOB AtomsGafferModuleSrc src/AtomsGafferModule/*.cpp )
 add_library( AtomsGafferModule SHARED ${AtomsGafferModuleSrc} )
 set_target_properties( AtomsGafferModule PROPERTIES PREFIX "" OUTPUT_NAME "_AtomsGaffer" )
-target_compile_definitions( AtomsGafferModule PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 )
+target_compile_definitions( AtomsGafferModule PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 _GLIBCXX_USE_CXX11_ABI=0)
 target_link_libraries( AtomsGafferModule AtomsGaffer )
 target_include_directories( AtomsGafferModule SYSTEM PRIVATE ${DEPENDENCY_INCLUDE_PATHS} ${PYTHON_ROOT}/include/python2.7 )
 target_include_directories( AtomsGafferModule PRIVATE include )

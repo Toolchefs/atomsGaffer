@@ -45,7 +45,7 @@ import GafferSceneTest
 
 import AtomsGaffer
 
-from AtomsTestData import buildCrowdTest
+from .AtomsTestData import buildCrowdTest
 
 class AtomsMetadataTest( GafferSceneTest.SceneTestCase ) :
 

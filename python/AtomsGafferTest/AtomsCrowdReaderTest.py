@@ -46,6 +46,7 @@ import GafferTest
 import GafferSceneTest
 
 import AtomsGaffer
+from six.moves import range
 
 class AtomsCrowdReaderTest( GafferSceneTest.SceneTestCase ) :
 

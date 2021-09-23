@@ -229,6 +229,7 @@ class AtomsCrowdReaderTest( GafferSceneTest.SceneTestCase ) :
 		self.assertTrue( "atoms:agents" in  attributes )
 		self.assertTrue( attributes["atoms:agents"].typeName(), IECore.BlindDataHolder.staticTypeName() )
 		blind_data = attributes["atoms:agents"].blindData()
+
 		for i in range( 25 ):
 			self.assertTrue( str( i ) in blind_data )
 			agent_data = blind_data[str( i )]
@@ -241,11 +242,12 @@ class AtomsCrowdReaderTest( GafferSceneTest.SceneTestCase ) :
 
 			self.assertTrue( "poseNormalWorldMatrices" in agent_data )
 			self.assertEqual(  len(agent_data["poseNormalWorldMatrices"]), 68 )
-			self.assertAlmostEqual( agent_data["poseNormalWorldMatrices"][2], pose_normal_matrix_data[i] )
-
 			self.assertTrue( "poseWorldMatrices" in agent_data )
 			self.assertEqual(  len(agent_data["poseWorldMatrices"]), 68 )
-			self.assertAlmostEqual( agent_data["poseWorldMatrices"][2], pose_matrix_data[i] )
+			for j in range( 4 ) :
+				for k in range( 4 ) :
+					self.assertAlmostEqual( agent_data["poseNormalWorldMatrices"][2][j][k], pose_normal_matrix_data[i][j][k] )
+					self.assertAlmostEqual( agent_data["poseWorldMatrices"][2][j][k], pose_matrix_data[i][j][k] )
 
 			self.assertTrue( "boundingBox" in agent_data )
 

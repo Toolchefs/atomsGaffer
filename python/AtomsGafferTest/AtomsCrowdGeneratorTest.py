@@ -47,7 +47,7 @@ import GafferSceneTest
 
 import AtomsGaffer
 
-from AtomsTestData import buildCrowdTest, buildVariationTest
+from .AtomsTestData import buildCrowdTest, buildVariationTest
 
 class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 

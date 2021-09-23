@@ -39,7 +39,7 @@ import IECore
 import Gaffer
 import AtomsGaffer
 
-import DocumentationAlgo
+from . import DocumentationAlgo
 
 Gaffer.Metadata.registerNode(
 

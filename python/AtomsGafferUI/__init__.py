@@ -41,11 +41,11 @@ __import__( "GafferSceneUI" )
 
 __import__( "AtomsGaffer" )
 
-import DocumentationAlgo
+from . import DocumentationAlgo
 
-import AtomsCrowdReaderUI
-import AtomsVariationReaderUI
-import AtomsCrowdGeneratorUI
-import AtomsAttributesUI
-import AtomsMetadataUI
-import AtomsCrowdClothReaderUI
+from . import AtomsCrowdReaderUI
+from . import AtomsVariationReaderUI
+from . import AtomsCrowdGeneratorUI
+from . import AtomsAttributesUI
+from . import AtomsMetadataUI
+from . import AtomsCrowdClothReaderUI

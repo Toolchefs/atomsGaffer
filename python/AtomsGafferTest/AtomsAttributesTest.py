@@ -55,7 +55,7 @@ class AtomsAttributesTest( GafferSceneTest.SceneTestCase ) :
 	@unittest.expectedFailure
 	def testCompute( self ) :
 
-		raise RuntimeError, "Write tests for AtomsAttributes"
+		raise RuntimeError("Write tests for AtomsAttributes")
 
 if __name__ == "__main__":
 	unittest.main()

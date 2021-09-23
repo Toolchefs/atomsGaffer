@@ -37,6 +37,6 @@
 __import__( "Gaffer" )
 __import__( "GafferScene" )
 
-from _AtomsGaffer import *
+from ._AtomsGaffer import *
 
 __import__( "IECore" ).loadConfig( "GAFFER_STARTUP_PATHS", subdirectory = "AtomsGaffer" )

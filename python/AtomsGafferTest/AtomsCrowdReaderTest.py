@@ -268,7 +268,7 @@ class AtomsCrowdReaderTest( GafferSceneTest.SceneTestCase ) :
 		for sss in ss :
 			if sss[0].isSame( a["out"] ) :
 				found = True
-		self.failUnless( found )
+		self.assertTrue( found )
 
 	def testEnabled( self ) :
 

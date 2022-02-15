@@ -1008,20 +1008,27 @@ void AtomsCrowdGenerator::hashBranchChildNames( const ScenePath &parentPath, con
 	else if( branchPath.size() == 1 )
 	{
 		// "/agents"
+		BranchCreator::hashBranchChildNames( parentPath, branchPath, context, h );
+		agentChildNamesHash( parentPath, context, h );
+	}
+	else if( branchPath.size() == 2 )
+	{
+		// "/agents/<agentType>"
         BranchCreator::hashBranchChildNames( parentPath, branchPath, context, h );
         agentChildNamesHash( parentPath, context, h );
         h.append( branchPath.back() );
 	}
-	else if( branchPath.size() <= 3 )
+	else if( branchPath.size() == 3 )
 	{
-		// "/agents/<agentType>" or "/agents/<agentType>/<variation>"
+		// "/agents/<agentType>/<variation>"
 		BranchCreator::hashBranchChildNames( parentPath, branchPath, context, h );
 		agentChildNamesHash( parentPath, context, h );
+		h.append( branchPath[1] );
 		h.append( branchPath.back() );
 	}
 	else
 	{
-		// "/agents/<agentName>/<id>/..."
+		// "/agents/<agentType>/<variation>/<id>/..."
 		AgentScope scope( context, branchPath );
 		h = variationsPlug()->childNamesPlug()->hash();
 	}

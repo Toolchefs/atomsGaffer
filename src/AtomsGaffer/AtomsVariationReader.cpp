@@ -134,7 +134,20 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
     auto &outP = p->writable();
     convertFromAtoms( outP, points );
 
-    MeshPrimitivePtr meshPtr = new MeshPrimitive( verticesPerFace, vertexIds, "linear", p );
+    // Get arnold subdiv_type, so we can instance MeshPrimitive according to the mesh type.
+    auto subdivType = "linear";
+    auto attrsMeta = geoMap->getTypedEntry<AtomsCore::MapMetadata>( "attributes" );
+    if ( attrsMeta ) {
+        auto arnoldMeta = attrsMeta->getTypedEntry<AtomsCore::MapMetadata>( "arnold" );
+        if ( arnoldMeta ) {
+            auto subdTypePtr = arnoldMeta->getTypedEntry<AtomsCore::StringMetadata>( "subdiv_type" );
+            if ( subdTypePtr && subdTypePtr->get() == "catclark" ) {
+                subdivType = "catmullClark";
+            }
+        }
+    }
+
+    MeshPrimitivePtr meshPtr = new MeshPrimitive( verticesPerFace, vertexIds, subdivType, p );
 
     meshPtr->variables["N"] = convertNormals( mesh );
     if ( genNref )

@@ -23,6 +23,7 @@ if(USE_GAFFER_DEPENDENCIES)
     set(TBB_ROOT ${GAFFER_ROOT})
     set(OPENEXR_ROOT ${GAFFER_ROOT})
     set(CORTEX_ROOT ${GAFFER_ROOT})
+    set(FMT_ROOT ${GAFFER_ROOT})
 endif()
 
 set(DEPENDENCY_INCLUDE_PATHS
@@ -32,6 +33,7 @@ set(DEPENDENCY_INCLUDE_PATHS
     ${OPENEXR_ROOT}/include/OpenEXR
     ${CORTEX_ROOT}/include
     ${GAFFER_ROOT}/include
+    ${FMT_ROOT}/include
     ${ATOMS_INCLUDE_PATH}
 )
 

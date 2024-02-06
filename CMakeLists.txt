@@ -37,6 +37,26 @@ set(DEPENDENCY_INCLUDE_PATHS
     ${ATOMS_INCLUDE_PATH}
 )
 
+# The Atoms version is defined in the AtomsUtils/Version.h file. We read
+# and parse it here for the major version
+if(NOT ATOMS_MAJOR_VERSION)
+  find_file(ATOMS_VERSION_H "Version.h" ${ATOMS_INCLUDE_PATH}/AtomsUtils NO_CACHE)
+  file(READ ${ATOMS_VERSION_H} ATOMS_VERSION_CONTENT)
+  string(REGEX MATCH "ATOMS_MAJOR_VERSION ([0-9]*)" _ ${ATOMS_VERSION_CONTENT})
+  set(ATOMS_MAJOR_VERSION ${CMAKE_MATCH_1})
+endif()
+
+# In Atoms 6 the half type definition was moved into the Atoms namespace.
+# When for example including AtomsUtils/Logger.h it will pull the half.h shipped with
+# Atoms into the file. Since we want to use the one coming with our Imath
+# version, we instruct the preprocessor to include `half.h` as if it was
+# the first instruction in whatever source file and it will include a `half.h`
+# found in one of the include paths (which we asume to be OpenExr/Imath).
+# We make this version dependent to keep the previous behavior for older (re)builds.
+if(ATOMS_MAJOR_VERSION VERSION_GREATER_EQUAL "6")
+  add_compile_options( -include "half.h" )
+endif()
+
 # build the library
 file( GLOB AtomsGafferSrc src/AtomsGaffer/*.cpp )
 link_directories( AtomsGaffer ${GAFFER_ROOT}/lib ${ATOMS_LIB_PATH} )
@@ -44,7 +64,11 @@ add_library( AtomsGaffer SHARED ${AtomsGafferSrc} )
 target_compile_definitions( AtomsGaffer PRIVATE BOOST_SIGNALS_NO_DEPRECATION_WARNING=1 LINUX=1 _GLIBCXX_USE_CXX11_ABI=0)
 target_include_directories( AtomsGaffer SYSTEM PRIVATE ${DEPENDENCY_INCLUDE_PATHS} )
 target_include_directories( AtomsGaffer PRIVATE include )
-target_link_libraries( AtomsGaffer Gaffer GafferScene AtomsCore AtomsGraph Atoms AtomsUtils )
+# Since Atoms version 6, symbols from AtomsCore, AtomsGraph and AtomsUtils have been
+# moved to the Atoms library, so we only link against the former for Atoms versions
+# less than 6.
+set(ATOMS_ADDITIONAL_LINK_LIBS AtomsCore AtomsGraph AtomsUtils)
+target_link_libraries( AtomsGaffer Gaffer GafferScene Atoms "$<$<VERSION_LESS:${ATOMS_MAJOR_VERSION},6>:${ATOMS_ADDITIONAL_LINK_LIBS}>")
 install( TARGETS AtomsGaffer DESTINATION lib )
 
 # build the python bindings

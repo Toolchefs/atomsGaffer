@@ -37,6 +37,43 @@ set(DEPENDENCY_INCLUDE_PATHS
     ${ATOMS_INCLUDE_PATH}
 )
 
+# If no OpenEXR major version is passed as an argument
+# we try to read the version from the OpenEXR cmake package config.
+if(NOT OPENEXR_MAJOR_VERSION)
+  # We assume OpenEXR being installed with their cmake package config files
+  # (normally in `lib/cmake` within the installation directory). So we add
+  # the root install directory to CMAKE_PREFIX_PATH for find_package
+  # to work
+  list(APPEND CMAKE_PREFIX_PATH ${OPENEXR_ROOT})
+  find_package(OpenEXR PATHS ${OPENEXR_ROOT} CONFIG)
+endif()
+
+# For OpenEXR version 3 and up, we have to add the Imath includes explicitly.
+# We are trying to find the Imath cmake package config and read it's
+# interface include directories to append them to the include path.
+# This works with gaffer dependencies as well with own builds of OpenEXR and Imath
+# which have their cmake directory anywhere in cmakes package search paths
+# As a fallback the root directory can be set via `IMATH_ROOT`.
+if(${OpenEXR_VERSION_MAJOR} AND ${OpenEXR_VERSION_MAJOR} VERSION_GREATER "2")
+  if(NOT IMATH_ROOT)
+    find_package(Imath CONFIG)
+    get_target_property(IMATH_INCLUDES Imath::ImathConfig INTERFACE_INCLUDE_DIRECTORIES)
+    list(APPEND DEPENDENCY_INCLUDE_PATHS ${IMATH_INCLUDES})
+  else()
+    list(APPEND DEPENDENCY_INCLUDE_PATHS "${IMATH_ROOT}/include")
+    list(APPEND DEPENDENCY_INCLUDE_PATHS "${IMATH_ROOT}/include/Imath")
+  endif()
+elseif(${OPENEXR_MAJOR_VERSION} AND ${OPENEXR_MAJOR_VERSION} VERSION_GREATER "2")
+  if(NOT IMATH_ROOT)
+    find_package(Imath CONFIG)
+    get_target_property(IMATH_INCLUDES Imath::ImathConfig INTERFACE_INCLUDE_DIRECTORIES)
+    list(APPEND DEPENDENCY_INCLUDE_PATHS ${IMATH_INCLUDES})
+  else()
+    list(APPEND DEPENDENCY_INCLUDE_PATHS "${IMATH_ROOT}/include")
+    list(APPEND DEPENDENCY_INCLUDE_PATHS "${IMATH_ROOT}/include/Imath")
+  endif()
+endif()
+
 # The Atoms version is defined in the AtomsUtils/Version.h file. We read
 # and parse it here for the major version
 if(NOT ATOMS_MAJOR_VERSION)

@@ -454,6 +454,8 @@ Imath::Box3f AtomsCrowdGenerator::computeBranchBound( const ScenePath &parentPat
         }
         return result;
     }
+
+    return Imath::Box3f();
 }
 
 bool AtomsCrowdGenerator::affectsBranchTransform( const Gaffer::Plug *input ) const

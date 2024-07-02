@@ -12,26 +12,27 @@ The Tool Chefs have open-sourced their [Atoms Crowd](https://atoms.toolchefs.com
 
 * cmake
 * Gaffer Install
-* Atoms Install
+* AtomsMaya Install
 
 **In a terminal:**
 
 ```
-setenv GAFFER_ROOT <gaffer install path>
-setenv ATOMS_ROOT <atoms install path>
-setenv ATOMSGAFFER_INSTALL_PREFIX <your desired install path>
-setenv PYTHON_VERSION 2.7
-
 cd atomsGaffer
-cmake -DGAFFER_ROOT=$GAFFER_ROOT -DATOMS_ROOT=$ATOMS_ROOT -DCMAKE_CXX_FLAGS='-std=c++14' -DPYTHON_VERSION=$PYTHON_VERSION -DCMAKE_INSTALL_PREFIX=$ATOMSGAFFER_INSTALL_PREFIX .
+cmake -DGAFFER_ROOT=/opt/gaffer-1.4.5.0-linux-gcc9 -DATOMS_MAYA_ROOT=/opt/Toolchefs/AtomsMaya -DMAYA_MAJOR_VERSION=2023 -DPYTHON_VERSION=3.10 -DCMAKE_INSTALL_PREFIX=/opt/Toolchefs/AtomsGaffer -DOPENEXR_MAJOR_VERSION=3 -DOpenEXR_VERSION_MAJOR=1 -DIMATH_ROOT=/opt/gaffer-1.4.5.0-linux-gcc9 .
 make install -j <num cores>)
 ```
 
 ### Runtime Instructions
 
-Now that you've installed the extension to `$ATOMSGAFFER_INSTALL_PREFIX`, you need to tell Gaffer about it:
+Now that you've installed the extension, you need to tell Gaffer about it:
 
-`setenv GAFFER_EXTENSION_PATHS $ATOMSGAFFER_INSTALL_PREFIX:$GAFFER_EXTENSION_PATHS`
+```
+export toolchefs_LICENSE=5053@localhost
+export ATOMS_GAFFER_ROOT=/opt/Toolchefs/AtomsGaffer
+export GAFFER_EXTENSION_PATHS=${ATOMS_GAFFER_ROOT}:${GAFFER_EXTENSION_PATHS}
+export LD_LIBRARY_PATH=/opt/Toolchefs/AtomsMaya/lib/2023:${LD_LIBRARY_PATH}
+gaffer
+```
 
 Next, test your install:
 

@@ -49,6 +49,7 @@
 #include "IECore/MessageHandler.h"
 
 #include "Atoms/Initialize.h"
+#include "Atoms/Version.h"
 #include "AtomsUtils/Logger.h"
 
 using namespace boost::python;
@@ -87,7 +88,11 @@ public:
 BOOST_PYTHON_MODULE( _AtomsGaffer )
 {
 	// Initialize atoms lib
+#if ATOMS_MAJOR_VERSION >= 7
+	AtomsUtils::LogType* mayaLogger(new GafferLogType());
+#else
 	AtomsPtr<AtomsUtils::LogType> mayaLogger(new GafferLogType());
+#endif
 	AtomsUtils::Logger::instance().setLogType(mayaLogger);
 	Atoms::initAtoms();
 

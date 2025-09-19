@@ -43,16 +43,16 @@ namespace AtomsGaffer
 enum class TypeId
 {
 	// make sure to claim a range with Cortex
-	FirstTypeId = 120000,
+	FirstTypeId = 128000,
 
-	AtomsCrowdReaderTypeId = 120001,
-	AtomsVariationReaderTypeId = 120002,
-	AtomsCrowdGeneratorTypeId = 120003,
-	AtomsMetadataTypeId = 120004,
-    AtomsAttributesTypeId = 120005,
-	AtomsCrowdClothReaderTypeId = 120006,
+	AtomsCrowdReaderTypeId = 128001,
+	AtomsVariationReaderTypeId = 128002,
+	AtomsCrowdGeneratorTypeId = 128003,
+	AtomsMetadataTypeId = 128004,
+    AtomsAttributesTypeId = 128005,
+	AtomsCrowdClothReaderTypeId = 128006,
 
-	LastTypeId = 120499,
+	LastTypeId = 128999,
 };
 
 } // namespace AtomsGaffer

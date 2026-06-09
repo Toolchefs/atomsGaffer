@@ -686,6 +686,63 @@ class AtomsCrowdGeneratorTest( GafferSceneTest.SceneTestCase ) :
 			}
 		)
 
+    def testPrefAndNrefAreStatic(self):
+        """
+        Verify that Pref and Nref remain equal to the rest pose P/ and N after AtomsCrowdGenerator
+        applies any deformation to the crowd agent .
+        """
+
+        variations = AtomsGaffer.AtomsVariationReader()
+        variations["atomsVariationFile"].setValue(
+            "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json"
+        )
+        variations["Pref"].setValue(True)
+        variations["Nref"].setValue(True)
+
+        crowd_input = AtomsGaffer.AtomsCrowdReader()
+        crowd_input["atomsSimFile"].setValue(
+            "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/cache/test_sim.atoms"
+        )
+
+        node = AtomsGaffer.AtomsCrowdGenerator()
+        node["parent"].setValue("/crowd")
+        node["in"].setInput(crowd_input["out"])
+        node["variations"].setInput(variations["out"])
+
+        variationMeshPath = "/atomsRobot/Robot1/RobotSkin1/body/robot1_body"
+        generatedMeshPath = (
+            "/crowd/agents/atomsRobot/Robot1/0/RobotSkin1/body/robot1_body"
+        )
+
+        # Get the restpose P and N from the variation reader
+        restMesh = variations["out"].object(variationMeshPath)
+        self.assertIn("Pref", restMesh)
+        self.assertIn("Nref", restMesh)
+        restP = list(restMesh["Pref"].data)
+        restN = list(restMesh["Nref"].data)
+        self.assertEqual(len(restP), 635)
+
+        # Get the generated mesh after skinning
+        generatedMesh = node["out"].object(generatedMeshPath)
+        self.assertEqual(
+            generatedMesh.typeName(), IECoreScene.MeshPrimitive.staticTypeName()
+        )
+        self.assertIn("Pref", generatedMesh)
+        self.assertIn("Nref", generatedMesh)
+
+        generatedPref = list(generatedMesh["Pref"].data)
+        generatedP = list(generatedMesh["P"].data)
+        generatedNref = list(generatedMesh["Nref"].data)
+        generatedN = list(generatedMesh["N"].data)
+
+        # Check if Pref and Nref equal to the restpositon values
+        self.assertEqual(generatedPref, restP)
+        self.assertEqual(generatedNref, restN)
+
+        # Check if P and N are animted/transformed
+        self.assertNotEqual(generatedP, restP)
+        self.assertNotEqual(generatedN, restN)
+
 
 if __name__ == "__main__":
 	unittest.main()

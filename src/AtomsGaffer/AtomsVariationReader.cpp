@@ -138,9 +138,9 @@ MeshPrimitivePtr convertAtomsMesh( AtomsPtr<AtomsCore::MapMetadata>& geoMap, boo
 
     meshPtr->variables["N"] = convertNormals( mesh );
     if ( genNref )
-        meshPtr->variables["Nref"] = meshPtr->variables["N"];
+        meshPtr->variables["Nref"] = PrimitiveVariable( meshPtr->variables["N"].interpolation, meshPtr->variables["N"].data->copy() );
     if ( genPref )
-        meshPtr->variables["Pref"] = meshPtr->variables["P"];
+        meshPtr->variables["Pref"] = PrimitiveVariable( meshPtr->variables["P"].interpolation, meshPtr->variables["P"].data->copy() );
 
     // Convert uv sets data
     auto& uvSets = mesh.uvSets();

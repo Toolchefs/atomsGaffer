@@ -786,5 +786,41 @@ class AtomsVariationReaderTest( GafferSceneTest.SceneTestCase ) :
 		)
 
 
+	def testPrefNref( self ) :
+		"""
+		Verify that enabling Pref and Nref produces the prim vars on the
+		output mesh and that each data is distinct after copying.
+		"""
+
+		node = AtomsGaffer.AtomsVariationReader()
+		node["atomsVariationFile"].setValue( "${ATOMS_GAFFER_ROOT}/examples/assets/atomsRobot/atomsRobot.json" )
+		node["Pref"].setValue( True )
+		node["Nref"].setValue( True )
+
+		obj = node["out"].object( "/atomsRobot/Robot1/RobotSkin1/body/robot1_body" )
+		self.assertEqual( obj.typeName(), IECoreScene.MeshPrimitive.staticTypeName() )
+
+		self.assertIn( "P", obj )
+		self.assertIn( "Pref", obj )
+		self.assertIn( "N", obj )
+		self.assertIn( "Nref", obj )
+
+		# Check interpolation and variable count
+		self.assertEqual( obj["P"].interpolation, IECoreScene.PrimitiveVariable.Interpolation.Vertex )
+		self.assertEqual( obj["Pref"].interpolation, IECoreScene.PrimitiveVariable.Interpolation.Vertex )
+		self.assertEqual( len( obj["Pref"].data ), len( obj["P"].data ) )
+
+		self.assertEqual( obj["N"].interpolation, IECoreScene.PrimitiveVariable.Interpolation.FaceVarying )
+		self.assertEqual( obj["Nref"].interpolation, IECoreScene.PrimitiveVariable.Interpolation.FaceVarying )
+		self.assertEqual( len( obj["Nref"].data ), len( obj["N"].data ) )
+
+		# Check data equality
+		self.assertEqual( list( obj["Pref"].data ), list( obj["P"].data ) )
+		self.assertEqual( list( obj["Nref"].data ), list( obj["N"].data ) )
+
+		# Check data is distinct
+		self.assertIsNot( obj["P"].data, obj["Pref"].data )
+		self.assertIsNot( obj["N"].data, obj["Nref"].data )
+
 if __name__ == "__main__":
 	unittest.main()

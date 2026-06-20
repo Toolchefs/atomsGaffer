@@ -669,12 +669,19 @@ ConstCompoundObjectPtr AtomsCrowdGenerator::computeBranchAttributes( const Scene
 
         // Need to find with point has the data of the current agent
         const std::vector<int> &agentIdVec = agentIdData->readable();
-        for ( size_t i = 0; i < agentIdVec.size(); ++i )
+        if (agentIdVec[currentAgentIndex] == currentAgentIndex)
         {
-            if ( agentIdVec[i] == currentAgentIndex )
+            agentIdPointIndex = currentAgentIndex;
+        }
+        else
+        {
+            for (size_t i = 0; i < agentIdVec.size(); ++i)
             {
-                agentIdPointIndex = i;
-                break;
+                if (agentIdVec[i] == currentAgentIndex)
+                {
+                    agentIdPointIndex = i;
+                    break;
+                }
             }
         }
 
@@ -866,12 +873,20 @@ ConstObjectPtr AtomsCrowdGenerator::computeBranchObject( const ScenePath &parent
     // We need this only to get blend shapes weights information
     const std::vector<int> &agentIdVec = agentIdData->readable();
 
-    for ( size_t i = 0; i < agentIdVec.size(); ++i )
+    // Fetch agent id. In most cases, the array index matches the agent id.
+    if (agentIdVec[currentAgentIndex] == currentAgentIndex)
     {
-        if ( agentIdVec[i] == currentAgentIndex )
+        agentIdPointIndex = currentAgentIndex;
+    }
+    else
+    {
+        for ( size_t i = 0; i < agentIdVec.size(); ++i )
         {
-            agentIdPointIndex = i;
-            break;
+            if ( agentIdVec[i] == currentAgentIndex )
+            {
+                agentIdPointIndex = i;
+                break;
+            }
         }
     }
 
@@ -1467,16 +1482,13 @@ void AtomsCrowdGenerator::applySkinDeformer(
 
         currentNormal *= transfromNormalMatrix;
         currentNormal.w = 0.0;
-        currentNormal.normalize();
 
         for ( size_t jId = 0; jId < jointIndexCountVec[pointId]; ++jId ) {
             int jointId = jointIndicesVec[offset];
             newN += currentNormal * jointWeightsVec[offset] * worldMatrices[jointId];
         }
 
-        newN *= transfromNormalMatrix;
-        newN.w = 0.0;
-        newN.normalize();
+        newN *= transfromNormalInverseMatrix;
 
         inNormal.x = newN.x;
         inNormal.y = newN.y;

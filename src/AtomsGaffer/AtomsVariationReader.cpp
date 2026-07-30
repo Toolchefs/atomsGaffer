@@ -1011,9 +1011,9 @@ Gaffer::ValuePlug::CachePolicy AtomsVariationReader::computeCachePolicy( const G
 {
 	if( output == enginePlug() )
 	{
-		// Request blocking compute for the engine, to avoid concurrent threads
-        // loading the same engine redundantly.
-		return ValuePlug::CachePolicy::Standard;
+		// Request collaborative compute for the engine, to avoid concurrent
+		// threads loading the same engine redundantly.
+		return ValuePlug::CachePolicy::TaskCollaboration;
 	}
 
 	return SceneNode::computeCachePolicy( output );
